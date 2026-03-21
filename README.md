@@ -100,7 +100,7 @@ Claude picks the right notebook, queries it, and uses the answer in context.
 
 ## Notebook Guide (Persona Configuration)
 
-The most impactful feature. NotebookLM has a **Notebook Guide** setting that defines the AI's role and expertise. Without it, you get generic answers. With it, you get domain-expert analysis.
+The most impactful feature. NotebookLM has a **Notebook Guide** setting that defines the AI's role and expertise. Find it at: `Chat → Customize → Notebook guide`. Without it, you get generic answers. With it, you get domain-expert analysis.
 
 ### The difference
 
