@@ -1,5 +1,7 @@
 <div align="center">
 
+**[English](README.md)** | **[繁體中文](README.zh-TW.md)**
+
 # NotebookLM Claude Code Skill
 
 **Turn NotebookLM into a per-project AI document manager for Claude Code**

@@ -1,5 +1,7 @@
 <div align="center">
 
+**[English](README.md)** | **[繁體中文](README.zh-TW.md)**
+
 # NotebookLM Claude Code Skill
 
 **讓 NotebookLM 成為 Claude Code 的專案級 AI 文件管理員**
