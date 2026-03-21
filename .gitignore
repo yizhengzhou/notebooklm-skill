@@ -1,0 +1,14 @@
+# Sensitive data
+data/
+auth_info.json
+browser_state/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# OS
+.DS_Store
