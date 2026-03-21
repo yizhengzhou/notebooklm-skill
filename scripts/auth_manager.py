@@ -18,13 +18,14 @@ import re
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
+from urllib.parse import urlparse, parse_qs
 
 from patchright.sync_api import sync_playwright, BrowserContext
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import BROWSER_STATE_DIR, STATE_FILE, AUTH_INFO_FILE, DATA_DIR
+from config import BROWSER_STATE_DIR, STATE_FILE, AUTH_INFO_FILE, DATA_DIR, ACCESS_DENIED_TEXT_PATTERNS
 from browser_utils import BrowserFactory
 
 
@@ -48,6 +49,26 @@ class AuthManager:
         self.state_file = STATE_FILE
         self.auth_info_file = AUTH_INFO_FILE
         self.browser_state_dir = BROWSER_STATE_DIR
+
+    @staticmethod
+    def extract_authuser(url: str) -> Optional[int]:
+        """
+        Extract authuser parameter from a NotebookLM URL.
+
+        Args:
+            url: NotebookLM notebook URL
+
+        Returns:
+            authuser index (int) or None if not present
+        """
+        try:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            if 'authuser' in params:
+                return int(params['authuser'][0])
+        except (ValueError, IndexError, KeyError):
+            pass
+        return None
 
     def is_authenticated(self) -> bool:
         """Check if valid authentication exists"""
@@ -130,9 +151,12 @@ class AuthManager:
 
                 print(f"  ✅ Login successful!")
 
+                # Detect which authuser is active from the final URL
+                detected_authuser = self.extract_authuser(page.url)
+
                 # Save authentication state
                 self._save_browser_state(context)
-                self._save_auth_info()
+                self._save_auth_info(authuser=detected_authuser)
                 return True
 
             except Exception as e:
@@ -167,15 +191,18 @@ class AuthManager:
             print(f"  ❌ Failed to save browser state: {e}")
             raise
 
-    def _save_auth_info(self):
-        """Save authentication metadata"""
+    def _save_auth_info(self, authuser: Optional[int] = None):
+        """Save authentication metadata including authuser index"""
         try:
             info = {
                 'authenticated_at': time.time(),
-                'authenticated_at_iso': time.strftime('%Y-%m-%d %H:%M:%S')
+                'authenticated_at_iso': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'authuser': authuser
             }
             with open(self.auth_info_file, 'w') as f:
                 json.dump(info, f, indent=2)
+            if authuser is not None:
+                print(f"  📋 Saved authuser={authuser} to auth info")
         except Exception:
             pass  # Non-critical
 
@@ -230,18 +257,77 @@ class AuthManager:
         # Setup new auth
         return self.setup_auth(headless, timeout_minutes)
 
-    def validate_auth(self) -> bool:
+    def check_access_denied(self, page) -> bool:
         """
-        Validate that stored authentication works
-        Uses persistent context to match actual usage pattern
+        Check if the current page shows an access denied / permission error.
 
         Returns:
-            True if authentication is valid
+            True if access is denied (wrong account or no permission)
+        """
+        try:
+            page_text = page.inner_text("body").lower()
+            for pattern in ACCESS_DENIED_TEXT_PATTERNS:
+                if pattern in page_text:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def diagnose_access_denied(self, page, notebook_url: Optional[str] = None) -> Optional[str]:
+        """
+        Check for access denied and return a diagnostic message if detected.
+        Encapsulates authuser mismatch diagnosis so callers don't need
+        to know about authuser internals.
+
+        Returns:
+            Diagnostic error message string, or None if access is OK
+        """
+        if not self.check_access_denied(page):
+            return None
+
+        expected = self.extract_authuser(notebook_url) if notebook_url else None
+        saved = self.get_auth_info().get('authuser')
+
+        parts = ["Access denied — you may be logged into the wrong Google account."]
+        if expected is not None:
+            detail = f"Notebook requires authuser={expected}"
+            if saved is not None:
+                detail += f", but you authenticated as authuser={saved}"
+            parts.append(detail + ".")
+        parts.append("Fix: Run re-authentication and log in with the correct Google account:")
+        parts.append("  python scripts/run.py auth_manager.py reauth")
+        return "\n".join(parts)
+
+    def validate_auth(self, notebook_url: Optional[str] = None) -> bool:
+        """
+        Validate that stored authentication works.
+        Uses persistent context to match actual usage pattern.
+        If notebook_url is provided, also checks that the authenticated account
+        can access that specific notebook (authuser match).
+
+        Args:
+            notebook_url: Optional notebook URL to validate access against
+
+        Returns:
+            True if authentication is valid (and notebook is accessible if URL provided)
         """
         if not self.is_authenticated():
             return False
 
         print("🔍 Validating authentication...")
+
+        # Check authuser mismatch before even launching browser
+        if notebook_url:
+            expected_authuser = self.extract_authuser(notebook_url)
+            if expected_authuser is not None:
+                auth_info = self.get_auth_info()
+                saved_authuser = auth_info.get('authuser')
+                if saved_authuser is not None and saved_authuser != expected_authuser:
+                    print(f"  ⚠️  Account mismatch: authenticated as authuser={saved_authuser}, "
+                          f"but notebook requires authuser={expected_authuser}")
+                    print(f"  💡 Run re-authentication and log in with the correct Google account "
+                          f"(authuser={expected_authuser})")
+                    return False
 
         playwright = None
         context = None
@@ -255,17 +341,29 @@ class AuthManager:
                 headless=True
             )
 
-            # Try to access NotebookLM
+            # Try to access NotebookLM (or specific notebook if URL provided)
+            target_url = notebook_url or "https://notebooklm.google.com"
             page = context.new_page()
-            page.goto("https://notebooklm.google.com", wait_until="domcontentloaded", timeout=30000)
+            page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
 
             # Check if we can access NotebookLM
-            if "notebooklm.google.com" in page.url and "accounts.google.com" not in page.url:
-                print("  ✅ Authentication is valid")
-                return True
-            else:
+            if "accounts.google.com" in page.url:
                 print("  ❌ Authentication is invalid (redirected to login)")
                 return False
+
+            if "notebooklm.google.com" in page.url:
+                # Check for access denied (wrong account)
+                time.sleep(2)  # Brief wait for page to fully render
+                access_error = self.diagnose_access_denied(page, notebook_url)
+                if access_error:
+                    print(f"  ❌ {access_error}")
+                    return False
+
+                print("  ✅ Authentication is valid")
+                return True
+
+            print("  ❌ Unexpected page state")
+            return False
 
         except Exception as e:
             print(f"  ❌ Validation failed: {e}")

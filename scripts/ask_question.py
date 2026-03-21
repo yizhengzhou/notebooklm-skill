@@ -79,6 +79,13 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
         # Wait for NotebookLM
         page.wait_for_url(re.compile(r"^https://notebooklm\.google\.com/"), timeout=10000)
 
+        # Check for access denied (wrong Google account)
+        time.sleep(2)  # Brief wait for page to fully render
+        access_error = auth.diagnose_access_denied(page, notebook_url)
+        if access_error:
+            print(f"  ❌ {access_error}")
+            return None
+
         # Wait for query input (MCP approach)
         print("  ⏳ Waiting for query input...")
         query_element = None
@@ -88,7 +95,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
                 query_element = page.wait_for_selector(
                     selector,
                     timeout=10000,
-                    state="visible"  # Only check visibility, not disabled!
+                    state="visible"
                 )
                 if query_element:
                     print(f"  ✓ Found input: {selector}")

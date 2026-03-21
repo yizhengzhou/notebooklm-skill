@@ -63,6 +63,20 @@ GUIDE_SUBMIT_SELECTORS = [
     'button[type="submit"]:has-text("Save")',
 ]
 
+# Access Denied Detection
+# Text patterns that indicate the user is logged into the wrong Google account.
+# Uses page text content matching (resilient to DOM changes) rather than CSS selectors.
+# Pre-lowercased for efficient case-insensitive matching
+ACCESS_DENIED_TEXT_PATTERNS = [
+    "you need access",
+    "需要存取權",
+    "request access",
+    "要求存取權",
+    "you don't have access",
+    "您沒有存取權",
+    "ask for access",
+]
+
 # Timeouts
 LOGIN_TIMEOUT_MINUTES = 10
 QUERY_TIMEOUT_SECONDS = 120
