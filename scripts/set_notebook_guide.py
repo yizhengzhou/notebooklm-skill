@@ -135,27 +135,50 @@ def set_notebook_guide(
         page.wait_for_url(re.compile(r"^https://notebooklm\.google\.com/"), timeout=15000)
         StealthUtils.random_delay(1500, 3000)
 
-        # Step 1: Open settings dialog (single JS call, text passed as argument)
+        # Step 1: Open settings dialog
+        # Try aria-label first (more reliable), then textContent fallback
         print("  ⚙️ Opening settings dialog...")
         opened = False
-        for text in _SETTINGS_BUTTON_TEXTS:
+
+        # Approach 1: aria-label matching (handles icon-only buttons)
+        _SETTINGS_ARIA_LABELS = ["設定筆記本", "Customize notebook", "Notebook guide"]
+        for label in _SETTINGS_ARIA_LABELS:
             try:
                 clicked = page.evaluate(
-                    """(btnText) => {
-                        const btns = document.querySelectorAll('button');
-                        for (const b of btns) {
-                            if (b.textContent.includes(btnText)) { b.click(); return true; }
-                        }
+                    """(ariaLabel) => {
+                        const btn = document.querySelector(`button[aria-label="${ariaLabel}"]`);
+                        if (btn) { btn.click(); return true; }
                         return false;
                     }""",
-                    text,
+                    label,
                 )
                 if clicked:
                     opened = True
-                    print(f"  ✓ Clicked settings button ('{text}')")
+                    print(f"  ✓ Clicked settings button (aria-label='{label}')")
                     break
             except Exception:
                 continue
+
+        # Approach 2: textContent fallback (legacy)
+        if not opened:
+            for text in _SETTINGS_BUTTON_TEXTS:
+                try:
+                    clicked = page.evaluate(
+                        """(btnText) => {
+                            const btns = document.querySelectorAll('button');
+                            for (const b of btns) {
+                                if (b.textContent.includes(btnText)) { b.click(); return true; }
+                            }
+                            return false;
+                        }""",
+                        text,
+                    )
+                    if clicked:
+                        opened = True
+                        print(f"  ✓ Clicked settings button (text='{text}')")
+                        break
+                except Exception:
+                    continue
 
         if not opened:
             print("  ❌ Could not find settings button")
