@@ -301,7 +301,7 @@ These are real issues encountered during development. Read these BEFORE modifyin
 
 ## Source Curation Methodology (Experimentally Validated)
 
-Based on A/B testing conducted 2026-03-20, the following practices improve NotebookLM answer quality:
+Based on A/B testing conducted 2026-03-20 and weighting experiments conducted 2026-03-22, the following practices improve NotebookLM answer quality. See [`references/weighting-experiment.md`](references/weighting-experiment.md) for the full experiment report with methodology and results.
 
 ### Category Prefix System
 
@@ -340,11 +340,24 @@ python scripts/run.py ask_question.py --question "Based only on [用戶痛點] s
 
 3. **Keep source count manageable.** Fewer, high-quality curated sources produce better answers than many raw sources. Aim for 5-10 well-structured sources per research topic.
 
+### Weighting Best Practices (Experimentally Validated 2026-03-22)
+
+A 3-round controlled experiment confirmed that embedding weight annotations in source text influences Gemini's answer ranking. Key findings:
+
+1. **Weight tags work:** `[權重:最高]`, `[權重:高]`, `[權重:中]`, `[權重:低]` are read and reflected by Gemini
+2. **Pair with source counts:** `[權重:最高 — 8個來源提及]` is more persuasive than tags alone
+3. **Spread weights apart:** If two items share `[最高]`, Gemini falls back to its own judgment. Limit `[最高]` to 1-2 items for clear ranking effect
+4. **Include "why" explanations:** A `**為何權重最高：**` line after each section increases Gemini's confidence in following the ranking
+5. **Gemini may merge related items:** Closely related pain points with similar weights may be combined into a single answer — design sources with this in mind
+
+Full methodology, raw results, and limitations: [`references/weighting-experiment.md`](references/weighting-experiment.md)
+
 ### Recommended Source Format
 
 For best results, structure curated sources with:
 - Clear headers per topic/pain point
-- Weight/frequency annotations (e.g., `[權重:最高]`, `[權重:高]`)
+- Weight/frequency annotations (e.g., `[權重:最高 — N個來源提及]`)
+- `**為何權重X：**` explanation per section
 - Direct quotes with attribution
 - Summary/conclusion per section
 
@@ -376,5 +389,6 @@ For best results, structure curated sources with:
   - `api_reference.md` - Detailed API documentation for all scripts
   - `troubleshooting.md` - Common issues and solutions
   - `usage_patterns.md` - Best practices and workflow examples
+  - `weighting-experiment.md` - Source weighting A/B test methodology and results
 - `.venv/` - Isolated Python environment (auto-created on first run)
 - `.gitignore` - Protects sensitive data from being committed
