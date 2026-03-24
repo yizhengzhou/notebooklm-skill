@@ -68,7 +68,9 @@ class NotebookLibrary:
         topics: List[str],
         content_types: Optional[List[str]] = None,
         use_cases: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
+        role: Optional[str] = None,
+        paired_with: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Add a new notebook to the library
@@ -81,6 +83,8 @@ class NotebookLibrary:
             content_types: Types of content (optional)
             use_cases: When to use this notebook (optional)
             tags: Additional tags for organization (optional)
+            role: Notebook role — "research" or "project" (optional)
+            paired_with: ID of paired notebook in dual-notebook architecture (optional)
 
         Returns:
             The created notebook object
@@ -102,6 +106,8 @@ class NotebookLibrary:
             'content_types': content_types or [],
             'use_cases': use_cases or [],
             'tags': tags or [],
+            'role': role,
+            'paired_with': paired_with,
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat(),
             'use_count': 0,
@@ -156,7 +162,9 @@ class NotebookLibrary:
         content_types: Optional[List[str]] = None,
         use_cases: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
-        url: Optional[str] = None
+        url: Optional[str] = None,
+        role: Optional[str] = None,
+        paired_with: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Update notebook metadata
@@ -188,6 +196,10 @@ class NotebookLibrary:
             notebook['tags'] = tags
         if url is not None:
             notebook['url'] = url
+        if role is not None:
+            notebook['role'] = role
+        if paired_with is not None:
+            notebook['paired_with'] = paired_with
 
         notebook['updated_at'] = datetime.now().isoformat()
 
@@ -319,6 +331,8 @@ def main():
     add_parser.add_argument('--topics', required=True, help='Comma-separated topics')
     add_parser.add_argument('--use-cases', help='Comma-separated use cases')
     add_parser.add_argument('--tags', help='Comma-separated tags')
+    add_parser.add_argument('--role', choices=['research', 'project'], help='Notebook role for dual-notebook architecture')
+    add_parser.add_argument('--paired-with', help='ID of paired notebook')
 
     # List command
     subparsers.add_parser('list', help='List all notebooks')
@@ -355,7 +369,9 @@ def main():
             description=args.description,
             topics=topics,
             use_cases=use_cases,
-            tags=tags
+            tags=tags,
+            role=args.role,
+            paired_with=getattr(args, 'paired_with', None)
         )
         print(json.dumps(notebook, indent=2))
 
@@ -365,7 +381,8 @@ def main():
             print("\n📚 Notebook Library:")
             for notebook in notebooks:
                 active = " [ACTIVE]" if notebook['id'] == library.active_notebook_id else ""
-                print(f"\n  📓 {notebook['name']}{active}")
+                role_tag = f" [{notebook.get('role', '').upper()}]" if notebook.get('role') else ""
+                print(f"\n  📓 {notebook['name']}{active}{role_tag}")
                 print(f"     ID: {notebook['id']}")
                 print(f"     Topics: {', '.join(notebook['topics'])}")
                 print(f"     Uses: {notebook['use_count']}")

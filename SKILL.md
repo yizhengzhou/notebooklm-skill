@@ -129,7 +129,12 @@ python scripts/run.py ask_question.py --question "..." --notebook-url "https://.
 
 # Show browser for debugging
 python scripts/run.py ask_question.py --question "..." --show-browser
+
+# Filter by category prefix (if sources are categorized)
+python scripts/run.py ask_question.py --question "Based only on [用戶痛點] sources, what are the top pain points?"
 ```
+
+**Tip:** If the notebook has categorized sources (e.g., `[用戶痛點]`, `[競品分析]`), include the prefix in your question to focus the answer. See "Category Prefix System" below for details.
 
 ## Follow-Up Mechanism (CRITICAL)
 
@@ -139,12 +144,25 @@ Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need 
 1. **STOP** - Do not immediately respond to user
 2. **ANALYZE** - Compare answer to user's original request
 3. **IDENTIFY GAPS** - Determine if more information needed
-4. **ASK FOLLOW-UP** - If gaps exist, immediately ask:
+4. **CONSIDER CATEGORY FILTERS** - If the notebook has categorized sources, ask targeted questions per category (e.g., `[競品分析]`, `[用戶痛點]`) to get focused answers from each source group
+5. **ASK FOLLOW-UP** - If gaps exist, immediately ask:
    ```bash
    python scripts/run.py ask_question.py --question "Follow-up with context..."
    ```
-5. **REPEAT** - Continue until information is complete
-6. **SYNTHESIZE** - Combine all answers before responding to user
+6. **REPEAT** - Continue until information is complete
+7. **SYNTHESIZE** - Combine all answers before responding to user
+
+## Notebook Role Routing
+
+When a project has paired notebooks (role: research + project), route queries based on intent:
+
+| Question type | Route to | Examples |
+|--------------|----------|----------|
+| Why / market / users / competitors | `role: research` | "What are the top pain points?", "How do competitors handle X?" |
+| What / specs / decisions / versions | `role: project` | "What did we decide about the auth module?", "What's in v2.0?" |
+| Unclear | Query both, synthesize | "Give me an overview of where the project stands" |
+
+Agent should check `notebook_manager.py list` for role and paired_with fields to determine routing.
 
 ## Script Reference
 
@@ -181,6 +199,16 @@ python scripts/run.py set_notebook_guide.py --persona "You are a senior VC analy
 **When to use:** When setting up a new project notebook, or when the user wants to change how NotebookLM responds. The persona shapes answer quality — a well-crafted guide makes responses dramatically more useful.
 
 **Agent workflow:** When creating a new project notebook, auto-generate a persona based on the project's goals and apply it automatically. Store the persona in the project's config for reproducibility.
+
+### Create Notebook (`create_notebook.py`)
+```bash
+# Create a single notebook
+python scripts/run.py create_notebook.py --name "My Notebook" [--role research|project] [--show-browser]
+
+# Create Research + Project pair (recommended for new projects)
+python scripts/run.py create_notebook.py --name "ProjectName" --pair [--show-browser]
+```
+**When to use:** When starting a new project that will use NotebookLM as its knowledge base. The `--pair` mode creates two linked notebooks following the planning/execution separation pattern (harness engineering).
 
 ### Add Text Source (`add_source.py`)
 ```bash
@@ -285,7 +313,7 @@ These are real issues encountered during development. Read these BEFORE modifyin
 - **Title input in paste dialog does NOT set the source name** — The `input.title-input` in the paste dialog is cosmetic. The source always defaults to "貼上的文字". We rename it AFTER insertion via the three-dot menu
 - **Rename dialog input class is `title-input` not `rename-input`** — The overlay uses `input.title-input` inside `.cdk-overlay-pane`. Using wrong selector silently fails (returns true but doesn't rename)
 - **Focus lands on submit button, not input** — After clicking "重新命名來源", the active element is the submit button. Must explicitly `.click()` the input before `.fill()`
-- **Multiple sources with same name** — If there are multiple "貼上的文字" sources, `querySelector` always picks the first one. Use `querySelectorAll` and pick the last (most recently added)
+- **Multiple sources with same name** — ~~If there are multiple "貼上的文字" sources, `querySelector` always picks the first one.~~ Fixed in v1.3.2: now uses `querySelectorAll` and picks the last (most recently added), with post-rename verification
 
 ### DOM & Selectors
 - **NotebookLM uses Angular Material CDK** — Overlays, menus, and dialogs are in `.cdk-overlay-pane` containers, NOT inside the main page DOM tree
@@ -326,11 +354,14 @@ python scripts/run.py ask_question.py --question "Based only on [用戶痛點] s
 
 | Prefix | Use For |
 |--------|---------|
-| `[用戶痛點]` | User pain points, forum discussions, community feedback |
-| `[競品分析]` | Competitor reviews, feature comparisons, pricing |
+| `[用戶痛點]` | User pain points, forum discussions, community feedback — sources about **what users need**, not about specific products |
+| `[競品分析]` | Competitor App Store reviews (both praise and complaints), feature comparisons, pricing — sources about **how competitors perform** |
 | `[學術研究]` | Academic papers, pedagogical research |
 | `[市場數據]` | Market size, trends, demographics |
 | `[產品規劃]` | Your own product specs, architecture docs |
+| `[LIVE]` | Official docs, API references, prompt guides, best practices — **sources that may become outdated**. When results seem off, re-import `[LIVE]` sources first before blaming AI randomness |
+
+**How to choose between `[用戶痛點]` and `[競品分析]`:** Prefixes are for **query filtering**, not content description. Ask: "Is this source telling me what users need, or how a competitor performs?" App Store reviews of competitors → `[競品分析]`. Reddit users describing their own frustrations (without referencing a specific product) → `[用戶痛點]`.
 
 ### Source Curation Principles
 

@@ -162,18 +162,29 @@ Prioritize insights using RICE scoring (Reach, Impact, Confidence, Effort).
 Always ground recommendations in user behavior data, not assumptions.
 ```
 
-### Scaling: When One Notebook Isn't Enough
+### Scaling: Dual-Notebook Architecture (Harness Engineering)
 
-NotebookLM has a source limit per notebook. For large projects, split notebooks by feature or domain instead of cramming everything into one:
+Inspired by the [harness engineering](https://openai.com/index/harness-engineering/) pattern of separating planning from execution, we recommend creating a **Research + Project notebook pair** for each project:
 
-```
-Large Project
-├── Notebook A (core architecture)    → Persona: System Architect
-├── Notebook B (user research)        → Persona: UX Researcher
-└── Notebook C (competitive intel)    → Persona: Market Analyst
+```bash
+python scripts/run.py create_notebook.py --name "MyProject" --pair
 ```
 
-Bind each notebook to a feature branch or module in your project config. The agent selects the right notebook based on the query context.
+This creates:
+- **[Research] MyProject** — market research, user pain points, competitor analysis
+- **[Project] MyProject** — product specs, version history, technical decisions
+
+```
+MyProject
+├── [Research] Notebook     → Persona: Market Analyst
+│   └── Why we're building this, who needs it, what competitors do
+└── [Project] Notebook      → Persona: Product Manager
+    └── What we're building, decisions made, version history
+```
+
+**Why separate?** When asking "what are the top pain points?", you want answers from research sources — not mixed with technical specs. When asking "what did we decide about auth?", you want project decisions — not competitor reviews. Role-based routing keeps answers focused.
+
+**Bonus:** The Project notebook doubles as a living pitch deck — use NotebookLM's built-in Audio Overview to generate project introductions for investors, clients, or team onboarding.
 
 ### Best Practices
 
@@ -320,6 +331,24 @@ python scripts/run.py ask_question.py \
   --question "Based only on [產品規劃] sources, what architecture decisions have we made?" \
   --notebook-id my-project
 ```
+
+### Source freshness: the `[LIVE]` convention
+
+NotebookLM captures a source's content at upload time. If the original document updates (e.g., an API reference, a prompt engineering guide, a framework's best practices), NotebookLM **does not** re-fetch it. Your notebook silently becomes stale.
+
+This is especially dangerous for sources that directly shape agent behavior — for example, if you uploaded a model's recommended prompt format and that format later changed, the agent will keep producing suboptimal prompts. You're likely to blame "AI randomness" rather than realizing your reference material is outdated.
+
+**Convention:** When adding sources that are likely to change over time, prefix them with `[LIVE]`:
+
+```bash
+python scripts/run.py add_source.py \
+  --category "LIVE" \
+  --title "NanoBanana prompt guide" \
+  --file nanob-guide.md \
+  --notebook-id my-project
+```
+
+This is a naming convention only — there is no automatic refresh yet. But it serves as a visual reminder when you browse your source list: anything tagged `[LIVE]` should be periodically checked and re-imported if the original has changed.
 
 ---
 

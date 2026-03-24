@@ -75,11 +75,16 @@ def _rename_source(page, new_name: str) -> bool:
     }""")
     StealthUtils.random_delay(1500, 2500)
 
-    # Find the source's more_vert button (look for "貼上的文字" or "Pasted text")
+    # Find the LAST source named "貼上的文字" (most recently added) and open its menu
+    # MUST use querySelectorAll + last match — querySelector grabs the first (oldest),
+    # which may be a leftover from a previous failed rename
     menu_opened = page.evaluate("""(defaultName) => {
-        const sourceBtn = document.querySelector('button[aria-label="' + defaultName + '"]')
-            || document.querySelector('button[aria-label="Pasted text"]');
-        if (!sourceBtn) return false;
+        const allBtns = [
+            ...document.querySelectorAll('button[aria-label="' + defaultName + '"]'),
+            ...document.querySelectorAll('button[aria-label="Pasted text"]')
+        ];
+        if (allBtns.length === 0) return false;
+        const sourceBtn = allBtns[allBtns.length - 1];
         const parent = sourceBtn.parentElement;
         const moreBtn = parent.querySelector('button[aria-label="更多"]')
             || parent.querySelector('button[aria-label="More"]');
@@ -151,8 +156,17 @@ def _rename_source(page, new_name: str) -> bool:
     if not submitted:
         page.keyboard.press("Enter")
 
-    StealthUtils.random_delay(1000, 2000)
-    return True
+    StealthUtils.random_delay(1500, 2500)
+
+    # Verify rename actually took effect by checking the source list
+    verified = page.evaluate("""(expectedName) => {
+        const btn = document.querySelector('button[aria-label="' + expectedName + '"]');
+        return btn !== null;
+    }""", new_name)
+
+    if not verified:
+        print(f"  ⚠️ Verification failed: '{new_name}' not found in source list after rename")
+    return verified
 
 
 def add_text_source(

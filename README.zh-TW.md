@@ -162,18 +162,29 @@ python scripts/run.py set_notebook_guide.py \
 所有建議必須以用戶行為數據為基礎，而非假設。
 ```
 
-### 擴展策略：當一個筆記本不夠用時
+### 擴展策略：雙 Notebook 架構（Harness Engineering）
 
-NotebookLM 每個筆記本有來源數量限制。當專案規模龐大時，依功能或領域拆分多個筆記本，而不是把所有東西塞進同一個：
+受 [harness engineering](https://openai.com/index/harness-engineering/) 規劃與執行分離模式的啟發，我們建議為每個專案建立 **Research + Project notebook 配對**：
 
-```
-大型專案
-├── 筆記本 A（核心架構）    → 角色：系統架構師
-├── 筆記本 B（用戶研究）    → 角色：UX 研究員
-└── 筆記本 C（競爭情報）    → 角色：市場分析師
+```bash
+python scripts/run.py create_notebook.py --name "MyProject" --pair
 ```
 
-在專案設定中將每個筆記本綁定到對應的功能分支或模組。Agent 會根據查詢內容自動選擇正確的筆記本。
+自動建立：
+- **[Research] MyProject** — 市場研究、用戶痛點、競品分析
+- **[Project] MyProject** — 產品規格、版本歷史、技術決策
+
+```
+MyProject
+├── [Research] Notebook     → 角色：市場分析師
+│   └── 為什麼要做、誰需要、競品怎麼做
+└── [Project] Notebook      → 角色：產品經理
+    └── 在做什麼、做了什麼決定、版本歷史
+```
+
+**為什麼分開？** 問「用戶最大的痛點是什麼」時，你只想從研究來源得到答案，不要混入技術規格。問「auth 模組怎麼決定的」時，你想要專案決策，不是競品分析。角色路由讓回答更精準。
+
+**額外價值：** Project notebook 可以當作活的簡報素材 — 用 NotebookLM 內建的 Audio Overview 功能隨時產出專案介紹，用於投資人簡報、客戶說明或團隊 onboarding。
 
 ### 最佳實踐
 
