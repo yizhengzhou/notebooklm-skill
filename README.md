@@ -431,8 +431,7 @@ This skill evolves with the latest AI agent methodologies. We actively incorpora
 | **1.4.0** | 2026-03-24 | Auto-create notebooks via browser automation. **Dual-notebook architecture** inspired by [harness engineering](https://openai.com/index/harness-engineering/) — separates research (planning) from project (execution) knowledge. Persona tone presets (`--tone vc`, `--tone critic`). `[LIVE]` source freshness convention. |
 | **1.3.2** | 2026-03-22 | Source rename fix (targets correct element). Category prefix decision guide (`[用戶痛點]` vs `[競品分析]`). Source weighting experiment results. |
 | **1.3.1** | 2026-03-21 | Multi-account authentication fix. Wrong Google account detection and diagnosis. |
-| **1.3.0** | 2025-11-21 | Modular architecture refactor. Timeout fix (30s → 120s). Thinking message detection. Stability polling. |
-| **1.2.0** | 2025-10-28 | Initial public release. Browser automation, notebook library, authentication. |
+| **1.0.0** | 2026-03-21 | Initial public release. Modular architecture, browser automation, notebook library, persona configuration, authentication. |
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
 

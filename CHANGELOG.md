@@ -50,40 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ask_question.py` shows actionable error with re-auth instructions instead of generic DOM errors / `ask_question.py` 顯示可操作的錯誤訊息與重新認證指示，取代無意義的 DOM 錯誤
   - Single-account users are unaffected / 單帳號用戶不受影響（所有檢查以 authuser 存在為前提）
 
-## [1.3.0] - 2025-11-21
+## [1.0.0] - 2026-03-21
 
-### Added
-- **Modular Architecture** - Refactored codebase for better maintainability
-  - New `config.py` - Centralized configuration (paths, selectors, timeouts)
-  - New `browser_utils.py` - BrowserFactory and StealthUtils classes
-  - Cleaner separation of concerns across all scripts
-
-### Changed
-- **Timeout increased to 120 seconds** - Long queries no longer timeout prematurely
-  - `ask_question.py`: 30s → 120s
-  - `browser_session.py`: 30s → 120s
-  - Resolves Issue #4
-
-### Fixed
-- **Thinking Message Detection** - Fixed incomplete answers showing placeholder text
-  - Now waits for `div.thinking-message` element to disappear before reading answer
-  - Answers like "Reviewing the content..." or "Looking for answers..." no longer returned prematurely
-  - Works reliably across all languages and NotebookLM UI changes
-
-- **Correct CSS Selectors** - Updated to match current NotebookLM UI
-  - Changed from `.response-content, .message-content` to `.to-user-container .message-text-content`
-  - Consistent selectors across all scripts
-
-- **Stability Detection** - Improved answer completeness check
-  - Now requires 3 consecutive stable polls instead of 1 second wait
-  - Prevents truncated responses during streaming
-
-## [1.2.0] - 2025-10-28
-
-### Added
-- Initial public release
-- NotebookLM integration via browser automation
-- Session-based conversations with Gemini 2.5
-- Notebook library management
-- Knowledge base preparation tools
-- Google authentication with persistent sessions
+### Added / 新增
+- **Initial public release / 首次公開發布**
+- NotebookLM integration via Patchright browser automation / 透過 Patchright 瀏覽器自動化整合 NotebookLM
+- Modular architecture: `config.py`, `browser_utils.py`, `browser_session.py` / 模組化架構
+- Query interface (`ask_question.py`) with 120s timeout and stability detection / 查詢介面，120 秒逾時，穩定性偵測
+- Notebook library management (`notebook_manager.py`) / 筆記本庫管理
+- Notebook guide / persona configuration (`set_notebook_guide.py`) / 對話角色設定
+- Source upload with auto-rename (`add_source.py`) / 來源上傳與自動重新命名
+- Google authentication with persistent sessions (`auth_manager.py`) / Google 認證與持久 session
+- Thinking message detection — waits for streaming to complete / Thinking 訊息偵測
+- CSS selectors for current NotebookLM UI / 當前 NotebookLM UI 的 CSS selectors
