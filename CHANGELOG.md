@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-03-24
 
+**Methodology update:** This release adopts the [harness engineering](https://openai.com/index/harness-engineering/) pattern emerging in 2026 — specifically the principle that planning and execution should be explicitly separated. We restructured the skill's core architecture from "one notebook per project" to "two notebooks per project" (Research + Project) to align with this methodology. / **方法論更新：** 本版本採用 2026 年興起的 [harness engineering](https://openai.com/index/harness-engineering/) 模式 — 特別是規劃與執行應明確分離的原則。我們將 skill 的核心架構從「一個專案一個筆記本」重構為「一個專案兩個筆記本」（Research + Project）以對齊此方法論。
+
 ### Added / 新增
 - **Create Notebook (`create_notebook.py`)** — Automatically create new NotebookLM notebooks via browser automation / 透過瀏覽器自動化自動建立新的 NotebookLM 筆記本
   - `--pair` mode creates Research + Project notebook pair in one command / `--pair` 模式一次建立 Research + Project 筆記本配對
+  - `--tone` presets: `default` (balanced), `vc` (investment lens), `critic` (harsh) / 語氣預設：平衡、創投視角、嚴苛批評
+  - Auto-configures personas for both notebooks on creation / 建立時自動設定兩個筆記本的角色
+  - Snapshot-based recovery: if URL redirect fails, finds new notebook via homepage diff / 快照式復原：URL 重定向失敗時，透過首頁差異找到新筆記本
   - Notebooks are automatically registered in the library with role and linking metadata / 自動註冊到圖書館，含角色和配對資訊
 - **Dual-Notebook Architecture** — Harness engineering-inspired planning/execution separation / 受 Harness Engineering 啟發的規劃/執行分離架構
   - `role` field ("research" or "project") for notebook routing / 筆記本角色欄位（research 或 project）用於查詢路由

@@ -11,7 +11,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Experimental-orange.svg)]()
 
-> One notebook per project. One persona per domain. Your AI agent gets a dedicated, source-grounded research partner that thinks like the expert you need — VC analyst, software architect, product manager — not a generic chatbot.
+> Two notebooks per project — one for research, one for execution. Each with its own expert persona. Your AI agent gets dedicated, source-grounded research partners that think like the experts you need — not a generic chatbot.
 
 > **Note:** This skill is under active development and experimentation by [Fork](https://fork.work). We use it daily in our own projects and are open-sourcing it to share what we've learned. Expect rough edges — contributions and feedback are welcome.
 
@@ -25,21 +25,24 @@
 
 Most NotebookLM integrations treat it as a Q&A tool — you ask, it answers.
 
-This skill takes a different approach: **NotebookLM as a per-project document manager.**
+This skill takes a different approach: **NotebookLM as a per-project knowledge base with planning/execution separation.**
 
-Each project gets its own notebook with its own expert persona. Your market research project talks to a VC analyst. Your API docs project talks to a software architect. Your product notebook thinks like a PM. The agent doesn't just retrieve information — it reasons about your documents through the lens of the domain expert you configured.
+Inspired by [harness engineering](https://openai.com/index/harness-engineering/), each project gets a **Research notebook** (why we're building this) and a **Project notebook** (what we're building). Each has its own expert persona. The agent routes questions to the right notebook automatically.
 
 ```
-Project A (market research)  → Notebook A → Persona: VC Analyst     → "Entry barrier is low, TAM shows..."
-Project B (API migration)    → Notebook B → Persona: Architect       → "This breaks the contract at..."
-Project C (user research)    → Notebook C → Persona: Product Manager → "RICE score suggests..."
+MyProject
+├── [Research] Notebook  → Persona: Market Analyst  → "Top 3 pain points from 30 forum posts..."
+│   └── User pain points, competitor reviews, market data
+└── [Project] Notebook   → Persona: Product Manager → "Auth module uses OAuth, decided on 03/15..."
+    └── Product specs, architecture decisions, version history
 ```
 
 **Key features:**
-- **One notebook per project** — bind a notebook ID in your project config, set once
-- **Expert personas** — configure how NotebookLM thinks and responds per domain
-- **Headless automation** — query and configure notebooks without opening a browser
-- **Library management** — tag, search, activate notebooks
+- **Dual-notebook architecture** — one command creates Research + Project pair (`--pair`)
+- **Expert personas with tone presets** — balanced, VC lens, or harsh critic (`--tone`)
+- **Automatic query routing** — agent picks the right notebook based on question intent
+- **Headless automation** — query, create, and configure notebooks without opening a browser
+- **Source organization** — category prefixes, weight annotations, `[LIVE]` freshness tracking
 - **One-time auth** — log in once, sessions persist
 
 ---
@@ -416,6 +419,22 @@ Features we're planning but haven't built yet:
 - **Source Export (`export_sources.py`)** — Download all sources from a notebook back to your local project folder. Insurance against Google's [track record](https://killedbygoogle.com/) of shutting down free services. Your knowledge shouldn't be locked inside any single platform.
 
 - **Live Source Refresh (`refresh_sources.py`)** — Some sources are "alive" (industry blogs, official docs, trend reports) — their content updates over time, but NotebookLM only captures what was there when you first added them. This feature would let you tag sources as `[LIVE]`, then periodically re-import them so your notebook's knowledge stays current. Turns NotebookLM from a static archive into a living knowledge base.
+
+---
+
+## What's New
+
+This skill evolves with the latest AI agent methodologies. We actively incorporate new patterns as the field develops.
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| **1.4.0** | 2026-03-24 | Auto-create notebooks via browser automation. **Dual-notebook architecture** inspired by [harness engineering](https://openai.com/index/harness-engineering/) — separates research (planning) from project (execution) knowledge. Persona tone presets (`--tone vc`, `--tone critic`). `[LIVE]` source freshness convention. |
+| **1.3.2** | 2026-03-22 | Source rename fix (targets correct element). Category prefix decision guide (`[用戶痛點]` vs `[競品分析]`). Source weighting experiment results. |
+| **1.3.1** | 2026-03-21 | Multi-account authentication fix. Wrong Google account detection and diagnosis. |
+| **1.3.0** | 2025-11-21 | Modular architecture refactor. Timeout fix (30s → 120s). Thinking message detection. Stability polling. |
+| **1.2.0** | 2025-10-28 | Initial public release. Browser automation, notebook library, authentication. |
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ---
 
