@@ -14,15 +14,45 @@ from browser_utils import BrowserFactory, StealthUtils
 from config import PAGE_LOAD_TIMEOUT
 
 
+def _snapshot_notebook_ids(page) -> set:
+    """Capture all notebook UUIDs currently visible on the homepage."""
+    ids = page.evaluate("""() => {
+        const links = document.querySelectorAll('a[href*="/notebook/"]');
+        const ids = new Set();
+        for (const a of links) {
+            const m = a.href.match(/notebook\\/([0-9a-f]{8}-[0-9a-f]{4}-[^?/]+)/);
+            if (m) ids.add(m[1]);
+        }
+        return [...ids];
+    }""")
+    return set(ids)
+
+
+def _find_new_notebook_on_homepage(page, before_ids: set, authuser: int) -> str:
+    """Return to homepage and find the notebook that didn't exist before."""
+    homepage = f"https://notebooklm.google.com?authuser={authuser}"
+    page.goto(homepage, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT)
+    StealthUtils.random_delay(3000, 5000)
+
+    after_ids = _snapshot_notebook_ids(page)
+    new_ids = after_ids - before_ids
+
+    if new_ids:
+        new_id = new_ids.pop()
+        return f"https://notebooklm.google.com/notebook/{new_id}?authuser={authuser}"
+    return None
+
+
 def _create_notebook_in_browser(headless: bool = True, authuser: int = 1) -> str:
     """Create a new empty notebook and return its URL.
 
-    Flow: Navigate to homepage -> Click create button -> Wait for redirect -> Return URL
+    Flow: Snapshot existing IDs -> Click create -> Wait for UUID redirect
+          If redirect fails, fallback to homepage diff to find the new notebook.
 
     Returns:
         The full URL of the newly created notebook
     Raises:
-        RuntimeError if creation fails
+        RuntimeError if creation fails AND recovery also fails
     """
     homepage = f"https://notebooklm.google.com?authuser={authuser}"
 
@@ -31,11 +61,13 @@ def _create_notebook_in_browser(headless: bool = True, authuser: int = 1) -> str
         try:
             page = context.pages[0] if context.pages else context.new_page()
 
-            # Step 1: Navigate to homepage
+            # Step 1: Navigate to homepage and snapshot existing notebooks
             print("  Opening NotebookLM homepage...")
             page.goto(homepage, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT)
             page.wait_for_url(re.compile(r"notebooklm\.google\.com"), timeout=15000)
             StealthUtils.random_delay(3000, 5000)
+
+            before_ids = _snapshot_notebook_ids(page)
 
             # Step 2: Click "建立新的筆記本" button
             print("  Creating new notebook...")
@@ -61,13 +93,24 @@ def _create_notebook_in_browser(headless: bool = True, authuser: int = 1) -> str
             # NotebookLM shows /notebook/creating as a transition page before redirecting
             # to the actual UUID URL. We must wait for the full UUID, not the transition.
             print("  Waiting for notebook to be created...")
-            page.wait_for_url(
-                re.compile(r"notebooklm\.google\.com/notebook/[0-9a-f]{8}-[0-9a-f]{4}-"),
-                timeout=60000
-            )
-            StealthUtils.random_delay(2000, 3000)
+            try:
+                page.wait_for_url(
+                    re.compile(r"notebooklm\.google\.com/notebook/[0-9a-f]{8}-[0-9a-f]{4}-"),
+                    timeout=60000
+                )
+                StealthUtils.random_delay(2000, 3000)
+                new_url = page.url
+            except Exception:
+                # Fallback: redirect failed or timed out, but notebook may exist.
+                # Go back to homepage and diff notebook IDs to find it.
+                print("  URL redirect failed, recovering via homepage diff...")
+                new_url = _find_new_notebook_on_homepage(page, before_ids, authuser)
+                if not new_url:
+                    raise RuntimeError(
+                        "Notebook was likely created but URL could not be captured. "
+                        "Check NotebookLM homepage manually."
+                    )
 
-            new_url = page.url
             print(f"  Notebook created: {new_url}")
             return new_url
 
