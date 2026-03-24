@@ -186,6 +186,33 @@ MyProject
 
 **額外價值：** Project notebook 可以當作活的簡報素材 — 用 NotebookLM 內建的 Audio Overview 功能隨時產出專案介紹，用於投資人簡報、客戶說明或團隊 onboarding。
 
+#### 角色語氣預設
+
+`--pair` 會自動替兩個 notebook 設定角色。選擇適合你專案階段的語氣：
+
+```bash
+# 平衡（預設）— 有證據支持的分析，適度挑戰假設
+python scripts/run.py create_notebook.py --name "MyProject" --pair
+
+# 創投視角 — 用投資人的眼光評估（TAM/SAM、護城河、單位經濟）
+python scripts/run.py create_notebook.py --name "MyProject" --pair --tone vc
+
+# 嚴苛批評 — 找致命缺陷，假設所有樂觀都是錯的直到證明
+python scripts/run.py create_notebook.py --name "MyProject" --pair --tone critic
+```
+
+| 語氣 | Research 角色 | Project 角色 | 適合場景 |
+|------|-------------|-------------|---------|
+| `default` | 市場研究分析師 | 產品經理 | 日常開發 |
+| `vc` | 創投分析師（投資視角） | 創投合夥人（執行審查） | 募資、簡報準備 |
+| `critic` | 殘酷市場批評家 | 無情技術審查者 | 上線前壓力測試 |
+
+**建立後可自訂：** 這些是起點。隨時用以下指令修改角色：
+
+```bash
+python scripts/run.py set_notebook_guide.py --persona "你的自訂角色..." --notebook-id ID
+```
+
 ### 最佳實踐
 
 1. **角色要具體** — 「資深創投分析師」 > 「有用的助手」

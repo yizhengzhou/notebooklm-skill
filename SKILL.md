@@ -207,8 +207,11 @@ python scripts/run.py create_notebook.py --name "My Notebook" [--role research|p
 
 # Create Research + Project pair (recommended for new projects)
 python scripts/run.py create_notebook.py --name "ProjectName" --pair [--show-browser]
+
+# Pair with persona tone: default (balanced), vc (investment lens), critic (harsh)
+python scripts/run.py create_notebook.py --name "ProjectName" --pair --tone vc [--show-browser]
 ```
-**When to use:** When starting a new project that will use NotebookLM as its knowledge base. The `--pair` mode creates two linked notebooks following the planning/execution separation pattern (harness engineering).
+**When to use:** When starting a new project that will use NotebookLM as its knowledge base. The `--pair` mode creates two linked notebooks with auto-configured personas following the planning/execution separation pattern (harness engineering). Use `--tone` to set how critically the personas evaluate your project.
 
 ### Add Text Source (`add_source.py`)
 ```bash

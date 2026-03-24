@@ -156,15 +156,88 @@ def create_notebook(
     return notebook
 
 
+# Persona presets per tone level
+# Each tone has a research persona and a project persona
+PERSONA_PRESETS = {
+    "default": {
+        "research": (
+            "You are a senior market research analyst and competitive intelligence specialist. "
+            "Your knowledge base contains user pain points, community feedback, competitor reviews, and market data. "
+            "When answering, prioritize direct user quotes and quantitative evidence. "
+            "Challenge assumptions with data. Flag when evidence is thin or conflicting. "
+            "Rank findings by frequency and severity."
+        ),
+        "project": (
+            "You are a senior product manager focused on execution clarity and decision traceability. "
+            "Your knowledge base contains product specs, architecture decisions, version history, and project progress. "
+            "When answering, reference specific decisions and their rationale. Flag outdated specs. "
+            "Structure answers as actionable items with clear ownership and status."
+        ),
+    },
+    "vc": {
+        "research": (
+            "You are a venture capital analyst evaluating this project as an investment opportunity. "
+            "Your knowledge base contains market research, user pain points, and competitor analysis. "
+            "Apply investment frameworks: TAM/SAM/SOM sizing, competitive moat analysis, unit economics. "
+            "Be skeptical — challenge every assumption. Ask whether the data supports the conclusion or if it's wishful thinking. "
+            "Flag risks that founders typically overlook."
+        ),
+        "project": (
+            "You are a VC partner reviewing this project's execution for a follow-on investment decision. "
+            "Your knowledge base contains product specs, version history, and technical decisions. "
+            "Evaluate execution velocity, technical debt, and strategic alignment. "
+            "Be direct — if something looks like scope creep or a bad architecture call, say so. "
+            "Compare progress against stated milestones ruthlessly."
+        ),
+    },
+    "critic": {
+        "research": (
+            "You are a brutally honest market critic. Your job is to find fatal flaws in this project's market assumptions. "
+            "Your knowledge base contains user pain points, competitor analysis, and market data. "
+            "Assume every optimistic claim is wrong until proven with hard data. "
+            "Point out survivorship bias, cherry-picked evidence, and missing competitive threats. "
+            "If the market opportunity is real, prove it with numbers, not narratives."
+        ),
+        "project": (
+            "You are a ruthless technical reviewer and product critic. "
+            "Your knowledge base contains product specs, architecture decisions, and version history. "
+            "Challenge every decision: is this over-engineered? Under-tested? Solving the wrong problem? "
+            "Flag feature creep, premature optimization, and missing error handling. "
+            "If a decision was good, explain why — don't just criticize."
+        ),
+    },
+}
+
+
+def _set_persona(notebook_url: str, persona: str, headless: bool = True):
+    """Set the notebook guide persona via set_notebook_guide.py."""
+    from set_notebook_guide import set_notebook_guide
+    result = set_notebook_guide(
+        persona=persona,
+        notebook_url=notebook_url,
+        response_length="long",
+        headless=headless,
+    )
+    return result
+
+
 def create_pair(
     project_name: str,
+    tone: str = "default",
     headless: bool = True,
 ) -> dict:
-    """Create a Research + Project notebook pair.
+    """Create a Research + Project notebook pair with personas.
+
+    Args:
+        project_name: Name of the project
+        tone: Persona tone — "default" (balanced), "vc" (investment lens), "critic" (harsh)
+        headless: Run browser in headless mode
 
     Returns:
         Dict with 'research' and 'project' notebook entries
     """
+    personas = PERSONA_PRESETS.get(tone, PERSONA_PRESETS["default"])
+
     print(f"Creating Research notebook for {project_name}...")
     research = create_notebook(
         name=f"[Research] {project_name}",
@@ -189,9 +262,16 @@ def create_pair(
     library.update_notebook(research['id'], paired_with=project['id'])
     library.update_notebook(project['id'], paired_with=research['id'])
 
-    print(f"\nNotebook pair created and linked!")
-    print(f"  Research: {research['id']}")
-    print(f"  Project:  {project['id']}")
+    # Set personas
+    print(f"\nSetting Research persona (tone: {tone})...")
+    _set_persona(research['url'], personas['research'], headless=headless)
+
+    print(f"\nSetting Project persona (tone: {tone})...")
+    _set_persona(project['url'], personas['project'], headless=headless)
+
+    print(f"\nNotebook pair created, linked, and configured!")
+    print(f"  Research: {research['id']} (persona: {tone})")
+    print(f"  Project:  {project['id']} (persona: {tone})")
 
     return {"research": research, "project": project}
 
@@ -203,6 +283,8 @@ def main():
     parser = argparse.ArgumentParser(description="Create NotebookLM notebooks")
     parser.add_argument("--name", required=True, help="Project or notebook name")
     parser.add_argument("--pair", action="store_true", help="Create Research + Project pair")
+    parser.add_argument("--tone", choices=["default", "vc", "critic"], default="default",
+                        help="Persona tone for --pair mode: default (balanced), vc (investment lens), critic (harsh)")
     parser.add_argument("--role", choices=["research", "project"], help="Notebook role (single mode)")
     parser.add_argument("--description", help="Notebook description")
     parser.add_argument("--topics", help="Comma-separated topics")
@@ -213,6 +295,7 @@ def main():
     if args.pair:
         result = create_pair(
             project_name=args.name,
+            tone=args.tone,
             headless=not args.show_browser,
         )
     else:

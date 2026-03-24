@@ -186,6 +186,33 @@ MyProject
 
 **Bonus:** The Project notebook doubles as a living pitch deck — use NotebookLM's built-in Audio Overview to generate project introductions for investors, clients, or team onboarding.
 
+#### Persona Tone Presets
+
+The `--pair` command auto-configures personas for both notebooks. Choose a tone that fits your project stage:
+
+```bash
+# Balanced (default) — supportive analysis with evidence-based challenges
+python scripts/run.py create_notebook.py --name "MyProject" --pair
+
+# VC lens — evaluates like an investor (TAM/SAM, moats, unit economics)
+python scripts/run.py create_notebook.py --name "MyProject" --pair --tone vc
+
+# Harsh critic — finds fatal flaws, assumes optimism is wrong until proven
+python scripts/run.py create_notebook.py --name "MyProject" --pair --tone critic
+```
+
+| Tone | Research Persona | Project Persona | Best for |
+|------|-----------------|-----------------|----------|
+| `default` | Market research analyst | Product manager | Active development |
+| `vc` | VC analyst (investment lens) | VC partner (execution review) | Fundraising, pitch prep |
+| `critic` | Brutal market critic | Ruthless technical reviewer | Pre-launch stress testing |
+
+**Customize after creation:** These are starting points. Change the persona anytime with:
+
+```bash
+python scripts/run.py set_notebook_guide.py --persona "Your custom persona..." --notebook-id ID
+```
+
 ### Best Practices
 
 1. **Be specific about the role** — "senior VC analyst" > "helpful assistant"
