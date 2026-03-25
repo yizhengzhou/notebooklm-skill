@@ -22,12 +22,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from auth_manager import AuthManager
 from notebook_manager import NotebookLibrary
-from config import QUERY_INPUT_SELECTORS, RESPONSE_SELECTORS
-from browser_utils import BrowserFactory, StealthUtils
+from browser_utils import (
+    BrowserFactory, StealthUtils,
+    find_visible_input, poll_for_stable_response,
+)
 
 
 # Follow-up reminder (adapted from MCP server for stateless operation)
-# Since we don't have persistent sessions, we encourage comprehensive questions
 FOLLOW_UP_REMINDER = (
     "\n\nEXTREMELY IMPORTANT: Is that ALL you need to know? "
     "You can always ask another question! Think about it carefully: "
@@ -37,160 +38,99 @@ FOLLOW_UP_REMINDER = (
 )
 
 
-def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> str:
+def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, quiet: bool = False) -> str:
     """
-    Ask a question to NotebookLM
-
-    Args:
-        question: Question to ask
-        notebook_url: NotebookLM notebook URL
-        headless: Run browser in headless mode
+    Ask a question to NotebookLM (single-shot browser session).
 
     Returns:
-        Answer text from NotebookLM
+        Raw answer text from NotebookLM (without FOLLOW_UP_REMINDER).
     """
+    def log(msg):
+        if not quiet:
+            print(msg)
+
     auth = AuthManager()
 
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: python auth_manager.py setup")
+        log("Warning: Not authenticated. Run: python auth_manager.py setup")
         return None
 
-    print(f"💬 Asking: {question}")
-    print(f"📚 Notebook: {notebook_url}")
+    log(f"Asking: {question}")
+    log(f"Notebook: {notebook_url}")
 
     playwright = None
     context = None
 
     try:
-        # Start playwright
         playwright = sync_playwright().start()
+        context = BrowserFactory.launch_persistent_context(playwright, headless=headless)
 
-        # Launch persistent browser context using factory
-        context = BrowserFactory.launch_persistent_context(
-            playwright,
-            headless=headless
-        )
-
-        # Navigate to notebook
         page = context.new_page()
-        print("  🌐 Opening notebook...")
+        log("  Opening notebook...")
         page.goto(notebook_url, wait_until="domcontentloaded")
 
-        # Wait for NotebookLM
         page.wait_for_url(re.compile(r"^https://notebooklm\.google\.com/"), timeout=10000)
 
-        # Check for access denied (wrong Google account)
-        time.sleep(2)  # Brief wait for page to fully render
+        time.sleep(2)
         access_error = auth.diagnose_access_denied(page, notebook_url)
         if access_error:
-            print(f"  ❌ {access_error}")
+            log(f"  Error: {access_error}")
             return None
 
-        # Wait for query input (MCP approach)
-        print("  ⏳ Waiting for query input...")
-        query_element = None
-
-        for selector in QUERY_INPUT_SELECTORS:
-            try:
-                query_element = page.wait_for_selector(
-                    selector,
-                    timeout=10000,
-                    state="visible"
-                )
-                if query_element:
-                    print(f"  ✓ Found input: {selector}")
-                    break
-            except:
-                continue
-
-        if not query_element:
-            print("  ❌ Could not find query input")
+        log("  Waiting for query input...")
+        input_selector = find_visible_input(page)
+        if not input_selector:
+            log("  Error: Could not find query input")
             return None
+        log(f"  Found input: {input_selector}")
 
-        # Type question (human-like, fast)
-        print("  ⏳ Typing question...")
-        
-        # Use primary selector for typing
-        input_selector = QUERY_INPUT_SELECTORS[0]
-        StealthUtils.human_type(page, input_selector, question)
+        log("  Typing question...")
+        if headless:
+            StealthUtils.fast_fill(page, input_selector, question)
+        else:
+            StealthUtils.human_type(page, input_selector, question)
 
-        # Submit
-        print("  📤 Submitting...")
+        log("  Submitting...")
         page.keyboard.press("Enter")
 
-        # Small pause
-        StealthUtils.random_delay(500, 1500)
+        if not headless:
+            StealthUtils.random_delay(500, 1500)
 
-        # Wait for response (MCP approach: poll for stable text)
-        print("  ⏳ Waiting for answer...")
+        log("  Waiting for answer...")
+        poll_interval = 0.5 if headless else 1
+        stable_threshold = 2 if headless else 3
 
-        answer = None
-        stable_count = 0
-        last_text = None
-        deadline = time.time() + 120  # 2 minutes timeout
-
-        while time.time() < deadline:
-            # Check if NotebookLM is still thinking (most reliable indicator)
-            try:
-                thinking_element = page.query_selector('div.thinking-message')
-                if thinking_element and thinking_element.is_visible():
-                    time.sleep(1)
-                    continue
-            except:
-                pass
-
-            # Try to find response with MCP selectors
-            for selector in RESPONSE_SELECTORS:
-                try:
-                    elements = page.query_selector_all(selector)
-                    if elements:
-                        # Get last (newest) response
-                        latest = elements[-1]
-                        text = latest.inner_text().strip()
-
-                        if text:
-                            if text == last_text:
-                                stable_count += 1
-                                if stable_count >= 3:  # Stable for 3 polls
-                                    answer = text
-                                    break
-                            else:
-                                stable_count = 0
-                                last_text = text
-                except:
-                    continue
-
-            if answer:
-                break
-
-            time.sleep(1)
+        answer = poll_for_stable_response(
+            page,
+            timeout=120,
+            poll_interval=poll_interval,
+            stable_threshold=stable_threshold,
+        )
 
         if not answer:
-            print("  ❌ Timeout waiting for answer")
+            log("  Error: Timeout waiting for answer")
             return None
 
-        print("  ✅ Got answer!")
-        # Add follow-up reminder to encourage Claude to ask more questions
-        return answer + FOLLOW_UP_REMINDER
+        log("  Got answer!")
+        return answer
 
     except Exception as e:
-        print(f"  ❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        log(f"  Error: {e}")
+        if not quiet:
+            import traceback
+            traceback.print_exc()
         return None
 
     finally:
-        # Always clean up
         if context:
             try:
                 context.close()
-            except:
+            except Exception:
                 pass
-
         if playwright:
             try:
                 playwright.stop()
-            except:
+            except Exception:
                 pass
 
 
@@ -200,9 +140,15 @@ def main():
     parser.add_argument('--question', required=True, help='Question to ask')
     parser.add_argument('--notebook-url', help='NotebookLM notebook URL')
     parser.add_argument('--notebook-id', help='Notebook ID from library')
-    parser.add_argument('--show-browser', action='store_true', help='Show browser')
+    parser.add_argument('--show-browser', action='store_true', help='Show browser (enables stealth mode delays)')
+    parser.add_argument('--quiet', action='store_true', help='Suppress all output except the final answer')
 
     args = parser.parse_args()
+    quiet = args.quiet
+
+    def log(msg):
+        if not quiet:
+            print(msg)
 
     # Resolve notebook URL
     notebook_url = args.notebook_url
@@ -213,49 +159,61 @@ def main():
         if notebook:
             notebook_url = notebook['url']
         else:
-            print(f"❌ Notebook '{args.notebook_id}' not found")
+            log(f"Error: Notebook '{args.notebook_id}' not found")
             return 1
 
     if not notebook_url:
-        # Check for active notebook first
         library = NotebookLibrary()
         active = library.get_active_notebook()
         if active:
             notebook_url = active['url']
-            print(f"📚 Using active notebook: {active['name']}")
+            log(f"Using active notebook: {active['name']}")
         else:
-            # Show available notebooks
             notebooks = library.list_notebooks()
             if notebooks:
-                print("\n📚 Available notebooks:")
+                log("\nAvailable notebooks:")
                 for nb in notebooks:
                     mark = " [ACTIVE]" if nb.get('id') == library.active_notebook_id else ""
-                    print(f"  {nb['id']}: {nb['name']}{mark}")
-                print("\nSpecify with --notebook-id or set active:")
-                print("python scripts/run.py notebook_manager.py activate --id ID")
+                    log(f"  {nb['id']}: {nb['name']}{mark}")
+                log("\nSpecify with --notebook-id or set active:")
+                log("python scripts/run.py notebook_manager.py activate --id ID")
             else:
-                print("❌ No notebooks in library. Add one first:")
-                print("python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
+                log("No notebooks in library. Add one first:")
+                log("python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
             return 1
 
-    # Ask the question
-    answer = ask_notebooklm(
-        question=args.question,
-        notebook_url=notebook_url,
-        headless=not args.show_browser
-    )
+    # Try daemon first (instant if running), fall back to single-shot browser
+    answer = None
+    if not args.show_browser:
+        from browser_daemon import daemon_query  # lazy import — avoids side effects when unused
+        answer = daemon_query(notebook_url, args.question)
+        if answer:
+            log("  (via daemon)")
+
+    if not answer:
+        answer = ask_notebooklm(
+            question=args.question,
+            notebook_url=notebook_url,
+            headless=not args.show_browser,
+            quiet=quiet
+        )
 
     if answer:
-        print("\n" + "=" * 60)
-        print(f"Question: {args.question}")
-        print("=" * 60)
-        print()
-        print(answer)
-        print()
-        print("=" * 60)
+        # Append follow-up reminder once, at the output boundary
+        answer = answer + FOLLOW_UP_REMINDER
+        if quiet:
+            print(answer)
+        else:
+            print("\n" + "=" * 60)
+            print(f"Question: {args.question}")
+            print("=" * 60)
+            print()
+            print(answer)
+            print()
+            print("=" * 60)
         return 0
     else:
-        print("\n❌ Failed to get answer")
+        log("\nFailed to get answer")
         return 1
 
 

@@ -36,6 +36,11 @@ BROWSER_ARGS = [
     '--no-default-browser-check'
 ]
 
+# Additional args when running headless (uses Chrome's new headless mode, more invisible)
+HEADLESS_BROWSER_ARGS = BROWSER_ARGS + [
+    '--headless=new',
+]
+
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 
 # Notebook Guide Selectors (設定對話 dialog)

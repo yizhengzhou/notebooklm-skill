@@ -186,8 +186,29 @@ python scripts/run.py notebook_manager.py stats
 
 ### Question Interface (`ask_question.py`)
 ```bash
-python scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser]
+python scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser] [--quiet]
 ```
+
+**Performance flags:**
+- `--quiet` — Suppress all progress output; print only the raw answer. **Always use this in automated/agent workflows** to minimize token consumption.
+- Without `--show-browser`, headless mode uses fast JS input (no typing delay) and faster polling.
+- If the browser daemon is running, queries are routed through it automatically (no cold-start overhead).
+
+### Browser Daemon (Persistent Session)
+```bash
+python scripts/run.py daemon start [--timeout 600]  # Start daemon (auto-exits after idle timeout)
+python scripts/run.py daemon stop                     # Stop running daemon
+python scripts/run.py daemon status                   # Check daemon status
+```
+
+**When to use:** Start the daemon before a session with multiple NotebookLM queries. The daemon keeps a browser alive in the background, eliminating the ~5s cold-start per query. Queries automatically route through the daemon when it's running — no changes to `ask_question.py` calls needed.
+
+**How it works:**
+- Daemon launches headless Chromium once, keeps it alive
+- Reuses the same page/tab for repeated queries to the same notebook
+- Auto-exits after configurable idle timeout (default: 10 minutes)
+- Falls back gracefully to single-shot mode if daemon is not running
+- Log file: `/tmp/notebooklm-daemon.log`
 
 ### Notebook Guide / Persona (`set_notebook_guide.py`)
 ```bash
@@ -283,7 +304,7 @@ Check/Add notebook → python scripts/run.py notebook_manager.py list/add (with 
     ↓
 Activate notebook → python scripts/run.py notebook_manager.py activate --id ID
     ↓
-Ask question → python scripts/run.py ask_question.py --question "..."
+Ask question → python scripts/run.py ask_question.py --question "..." --quiet
     ↓
 See "Is that ALL you need?" → Ask follow-ups until complete
     ↓
@@ -307,7 +328,7 @@ These are real issues encountered during development. Read these BEFORE modifyin
 ### Browser & Authentication
 - **Auth MUST use visible browser** — `headless=True` will fail for Google login. Always use `--show-browser` for `auth_manager.py setup`
 - **Use `python3` not `python`** — On macOS and RPi, `python` may not exist. Always use `python3` or the `run.py` wrapper
-- **Each query = new browser session** — There is NO session persistence between queries. Every `ask_question.py` call opens a fresh browser and closes it after. Include full context in every question
+- **Each query = new browser session (unless daemon is running)** — Without the daemon, every `ask_question.py` call opens a fresh browser and closes it after. Start the daemon (`python scripts/run.py daemon start`) to reuse browser sessions across queries
 - **`accessrequest` in URL = wrong account** — If the page redirects to an access request page, the `authuser` parameter doesn't match the logged-in account
 
 ### Add Source (`add_source.py`)
@@ -408,10 +429,9 @@ For best results, structure curated sources with:
 
 ## Limitations
 
-- No session persistence (each question = new browser)
 - Rate limits on free Google accounts (50 queries/day)
 - Manual upload required (user must add docs to NotebookLM)
-- Browser overhead (few seconds per question)
+- Without daemon: ~8s overhead per query (browser cold-start); with daemon: ~2-3s
 
 ## Resources (Skill Structure)
 
