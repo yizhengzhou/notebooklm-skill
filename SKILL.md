@@ -164,6 +164,29 @@ When a project has paired notebooks (role: research + project), route queries ba
 
 Agent should check `notebook_manager.py list` for role and paired_with fields to determine routing.
 
+## When NotebookLM Says "Not in Sources" (IMPORTANT)
+
+NotebookLM can ONLY answer from uploaded documents. When Gemini responds with "I don't have information about that" or "this is not covered in the sources", this does NOT mean the question is unanswerable. It means:
+
+**The knowledge gap is in the notebook, not in the world.**
+
+**Required agent behavior:**
+
+1. **DO NOT tell the user "NotebookLM doesn't know this"** — that's misleading. The correct framing is: "This information hasn't been added to the notebook yet."
+2. **DO NOT skip the question** — the user asked it for a reason.
+3. **DO research it externally** — use web search, firecrawl, or other tools to find the answer.
+4. **THEN offer to add it** — "I found the answer via web search. Want me to add this to the notebook so it's available for future queries?"
+
+**Example flow:**
+```
+User: "What API does UtaTen use for search?"
+→ Agent queries NotebookLM → Gemini says "not in sources"
+→ Agent researches externally → finds UtaTen's API documentation
+→ Agent answers the user AND offers to upload the finding to the notebook
+```
+
+**The notebook is a living knowledge base.** Every "not found" answer is an opportunity to make it more complete. The agent's job is to fill gaps, not report them.
+
 ## Script Reference
 
 ### Authentication Management (`auth_manager.py`)
