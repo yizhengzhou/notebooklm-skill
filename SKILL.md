@@ -164,28 +164,30 @@ When a project has paired notebooks (role: research + project), route queries ba
 
 Agent should check `notebook_manager.py list` for role and paired_with fields to determine routing.
 
-## When NotebookLM Says "Not in Sources" (IMPORTANT)
+## Understanding NotebookLM's Scope (IMPORTANT)
 
-NotebookLM can ONLY answer from uploaded documents. When Gemini responds with "I don't have information about that" or "this is not covered in the sources", this does NOT mean the question is unanswerable. It means:
+NotebookLM is your project's **document manager** — it answers exclusively from uploaded sources, with citations. This is its strength, not a limitation. It means every answer is grounded in your actual research, not hallucinated.
 
-**The knowledge gap is in the notebook, not in the world.**
+**When Gemini says "not in sources"**, tell the user clearly:
+
+> "NotebookLM only answers from documents you've uploaded. This question requires information that hasn't been added to the notebook yet. NotebookLM's best use is as your project's knowledge base — for questions outside its sources, we should research externally and then add the findings to make the notebook more complete."
 
 **Required agent behavior:**
 
-1. **DO NOT tell the user "NotebookLM doesn't know this"** — that's misleading. The correct framing is: "This information hasn't been added to the notebook yet."
-2. **DO NOT skip the question** — the user asked it for a reason.
-3. **DO research it externally** — use web search, firecrawl, or other tools to find the answer.
-4. **THEN offer to add it** — "I found the answer via web search. Want me to add this to the notebook so it's available for future queries?"
+1. **Be transparent** — explain that NotebookLM answers only from uploaded documents. The user should understand this so they can use NotebookLM effectively even without this skill.
+2. **Don't stop at the gap** — research externally using web search, firecrawl, or other tools.
+3. **Offer to grow the knowledge base** — "I found the answer. Want me to add this to the notebook so it's available next time?"
 
 **Example flow:**
 ```
 User: "What API does UtaTen use for search?"
 → Agent queries NotebookLM → Gemini says "not in sources"
-→ Agent researches externally → finds UtaTen's API documentation
-→ Agent answers the user AND offers to upload the finding to the notebook
+→ Agent explains: "This isn't in the notebook yet — NotebookLM only knows what's been uploaded."
+→ Agent researches externally → finds the answer
+→ Agent offers: "Want me to add this to the notebook for future reference?"
 ```
 
-**The notebook is a living knowledge base.** Every "not found" answer is an opportunity to make it more complete. The agent's job is to fill gaps, not report them.
+**The notebook grows with your project.** Every gap found is a chance to make it more complete. Over time, most questions should be answerable from the notebook — that's the goal.
 
 ## Script Reference
 
