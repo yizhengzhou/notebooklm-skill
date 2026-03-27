@@ -60,6 +60,28 @@ NotebookLM doesn't retrieve chunks — it **understands** your documents. It cor
 
 ---
 
+## Philosophy: The Notebook as Project Interface
+
+Beyond source-grounded Q&A, we believe the notebook serves three distinct roles for a project:
+
+### 1. Knowledge Base — structured memory for agents
+
+The dual-notebook architecture (Research + Project) gives your agent a persistent, organized memory. Instead of re-researching the same questions, the agent queries the notebook and gets citation-backed answers from your accumulated research. Over time, most project questions become answerable from the notebook — that's the goal.
+
+### 2. Cognitive Feedback Loop — a mirror for your own thinking
+
+When you write a product spec and upload it to NotebookLM, then listen to the Audio Overview discuss it as a podcast, something shifts. You hear your own ideas from a third-person perspective. Blind spots surface. Assumptions get challenged. This isn't just a different output format — it's a different cognitive mode. Reading your spec is first-person thinking. Hearing two people debate it is third-person thinking. The gap between those two perspectives is where the best improvements come from.
+
+### 3. Conversational Entry Point — an interface for humans
+
+A project's file folder is for the developer. It's full of versioned files, config, and context that makes sense to the person who wrote it. For anyone else — a new team member, a collaborator, an investor — it's impenetrable.
+
+The notebook is the project's **human interface**. Anyone can open it and ask questions in natural language: "What does this project do?", "Why did we choose this architecture?", "What are the main risks?" They don't need to understand the folder structure, the git history, or the codebase. The notebook meets them where they are.
+
+This is why we treat the notebook as a first-class project artifact, not a side tool. It's the layer between raw project files and the people who need to understand them.
+
+---
+
 ## Installation
 
 ```bash
@@ -414,11 +436,23 @@ This is a naming convention only — there is no automatic refresh yet. But it s
 
 ## Roadmap
 
-Features we're planning but haven't built yet:
+### Near-term
 
 - **Source Export (`export_sources.py`)** — Download all sources from a notebook back to your local project folder. Insurance against Google's [track record](https://killedbygoogle.com/) of shutting down free services. Your knowledge shouldn't be locked inside any single platform.
 
-- **Live Source Refresh (`refresh_sources.py`)** — Some sources are "alive" (industry blogs, official docs, trend reports) — their content updates over time, but NotebookLM only captures what was there when you first added them. This feature would let you tag sources as `[LIVE]`, then periodically re-import them so your notebook's knowledge stays current. Turns NotebookLM from a static archive into a living knowledge base.
+- **Live Source Refresh (`refresh_sources.py`)** — Some sources are "alive" (industry blogs, official docs, trend reports) — their content updates over time, but NotebookLM only captures what was there when you first added them. This feature would let you tag sources as `[LIVE]`, then periodically re-import them so your notebook's knowledge stays current.
+
+### Long-term Vision
+
+The methodology behind this skill — dual-notebook architecture, source weighting, category prefixes, persona-driven analysis — is designed to be **platform-independent**. NotebookLM is the current implementation because it's excellent and free, but the patterns should survive the tool.
+
+We're exploring an open-source, self-hosted alternative that would bring the same methodology locally:
+- **Knowledge base** — structured, source-grounded project memory that any agent can query
+- **Cognitive feedback** — multi-format output (audio discussion, briefing docs, Q&A) for reviewing your own thinking from different angles
+- **Conversational interface** — anyone can ask the project questions without navigating raw files
+- **Full data ownership** — no dependency on external services
+
+Until then, Source Export ensures your data is never locked in.
 
 ---
 
