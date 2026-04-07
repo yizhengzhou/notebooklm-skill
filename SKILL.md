@@ -7,6 +7,7 @@ description: >
   Queries Google NotebookLM for source-grounded, citation-backed answers from Gemini.
   Browser automation via Patchright, notebook library management, persistent auth,
   text source upload with auto-naming, notebook guide/persona configuration.
+  問我的文件, 查筆記本, 加資料到NotebookLM.
 ---
 
 # NotebookLM Research Assistant Skill
@@ -412,6 +413,10 @@ python scripts/run.py ask_question.py --question "Based only on [用戶痛點] s
 
 **How to choose between `[用戶痛點]` and `[競品分析]`:** Prefixes are for **query filtering**, not content description. Ask: "Is this source telling me what users need, or how a competitor performs?" App Store reviews of competitors → `[競品分析]`. Reddit users describing their own frustrations (without referencing a specific product) → `[用戶痛點]`.
 
+### Source Upload Criteria (The Upload Gate)
+
+Before uploading ANY file, run it through the 4-gate decision framework: **Stability → Retrievability → Irreplaceability → Signal-to-Noise**. Full criteria and examples: [`references/source-upload-criteria.md`](references/source-upload-criteria.md)
+
 ### Source Curation Principles
 
 1. **Sources should complement, not overlap.** Importing a Gemini Deep Research report into NotebookLM alongside NotebookLM's own Deep Research creates redundancy that suppresses unique insights from either source. (Experimentally confirmed: removing the overlapping source revealed different competitors and research that had been "crowded out".)
@@ -441,6 +446,37 @@ For best results, structure curated sources with:
 - Direct quotes with attribution
 - Summary/conclusion per section
 
+## Notebook Naming Convention (ENFORCED BY HOOK)
+
+A PreToolUse hook validates `--name` on every `create_notebook.py` and `notebook_manager.py add` command. Bad names are **blocked before execution**.
+
+### Rules
+1. **Minimum 3 characters** (after stripping `[Research]`/`[Project]` prefix)
+2. **No generic names**: test, notebook, untitled, new, temp, draft, sample, example
+3. **Descriptive**: name should indicate content, project, or purpose
+4. **Paired notebooks must share a project name** — use `--pair` which auto-prefixes `[Research]` and `[Project]`
+
+### Examples
+```bash
+# ✅ Good names
+--name "SingLingo"              # Project name
+--name "華錦精密 AI 轉型策略"      # Descriptive topic
+--name "App Market Radar Research 2026"  # Topic + year
+
+# ❌ Blocked by hook
+--name "test"                   # Generic
+--name "nb"                     # Too short
+--name "Untitled"               # Generic
+# (no --name at all)            # Missing
+```
+
+### For paired notebooks
+Always use `--pair` which enforces consistent naming:
+```bash
+# Creates "[Research] ProjectName" + "[Project] ProjectName"
+python scripts/run.py create_notebook.py --name "MissionJP" --pair
+```
+
 ## Best Practices
 
 1. **Always use run.py** - Handles environment automatically
@@ -469,5 +505,6 @@ For best results, structure curated sources with:
   - `troubleshooting.md` - Common issues and solutions
   - `usage_patterns.md` - Best practices and workflow examples
   - `weighting-experiment.md` - Source weighting A/B test methodology and results
+  - `source-upload-criteria.md` - The Upload Gate: 4-gate decision framework for whether to upload a file
 - `.venv/` - Isolated Python environment (auto-created on first run)
 - `.gitignore` - Protects sensitive data from being committed

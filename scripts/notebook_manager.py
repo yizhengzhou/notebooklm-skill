@@ -89,6 +89,11 @@ class NotebookLibrary:
         Returns:
             The created notebook object
         """
+        from naming import validate_notebook_name
+        error = validate_notebook_name(name)
+        if error:
+            raise ValueError(error)
+
         # Generate ID from name
         notebook_id = name.lower().replace(' ', '-').replace('_', '-')
 

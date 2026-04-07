@@ -120,6 +120,9 @@ def _create_notebook_in_browser(headless: bool = True, authuser: int = 1) -> str
             context.close()
 
 
+from naming import validate_notebook_name
+
+
 def create_notebook(
     name: str,
     role: str = None,
@@ -132,13 +135,18 @@ def create_notebook(
     Returns:
         The library entry dict for the new notebook
     """
+    error = validate_notebook_name(name)
+    if error:
+        print(f"❌ {error}")
+        sys.exit(1)
+
     auth_manager = AuthManager()
     if not auth_manager.is_authenticated():
         print("Not authenticated. Run: python scripts/run.py auth_manager.py setup")
         sys.exit(1)
 
     auth_info = auth_manager.get_auth_info()
-    authuser = auth_info.get("authuser", 1)
+    authuser = auth_info.get("authuser") or 1
 
     url = _create_notebook_in_browser(headless=headless, authuser=authuser)
 

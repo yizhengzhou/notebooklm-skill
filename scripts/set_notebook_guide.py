@@ -133,33 +133,47 @@ def set_notebook_guide(
         print("  🌐 Opening notebook...")
         page.goto(notebook_url, wait_until="domcontentloaded")
         page.wait_for_url(re.compile(r"^https://notebooklm\.google\.com/"), timeout=15000)
-        StealthUtils.random_delay(1500, 3000)
+        StealthUtils.random_delay(3000, 5000)
 
         # Step 1: Open settings dialog
-        # Try aria-label first (more reliable), then textContent fallback
+        # The "設定筆記本" button (class: configure-settings-button) is in the
+        # chat panel, not the top toolbar. Wait for it to render.
         print("  ⚙️ Opening settings dialog...")
         opened = False
 
-        # Approach 1: aria-label matching (handles icon-only buttons)
-        _SETTINGS_ARIA_LABELS = ["設定筆記本", "Customize notebook", "Notebook guide"]
-        for label in _SETTINGS_ARIA_LABELS:
-            try:
-                clicked = page.evaluate(
-                    """(ariaLabel) => {
-                        const btn = document.querySelector(`button[aria-label="${ariaLabel}"]`);
-                        if (btn) { btn.click(); return true; }
-                        return false;
-                    }""",
-                    label,
-                )
-                if clicked:
-                    opened = True
-                    print(f"  ✓ Clicked settings button (aria-label='{label}')")
-                    break
-            except Exception:
-                continue
+        # Approach 1: CSS class (most reliable — unique class name)
+        try:
+            btn = page.wait_for_selector(
+                "button.configure-settings-button", timeout=15000, state="visible"
+            )
+            if btn:
+                btn.click()
+                opened = True
+                print("  ✓ Clicked settings button (class='configure-settings-button')")
+        except Exception:
+            pass
 
-        # Approach 2: textContent fallback (legacy)
+        # Approach 2: aria-label matching (handles icon-only buttons)
+        if not opened:
+            _SETTINGS_ARIA_LABELS = ["設定筆記本", "Customize notebook", "Notebook guide"]
+            for label in _SETTINGS_ARIA_LABELS:
+                try:
+                    clicked = page.evaluate(
+                        """(ariaLabel) => {
+                            const btn = document.querySelector(`button[aria-label="${ariaLabel}"]`);
+                            if (btn) { btn.click(); return true; }
+                            return false;
+                        }""",
+                        label,
+                    )
+                    if clicked:
+                        opened = True
+                        print(f"  ✓ Clicked settings button (aria-label='{label}')")
+                        break
+                except Exception:
+                    continue
+
+        # Approach 3: textContent fallback (legacy)
         if not opened:
             for text in _SETTINGS_BUTTON_TEXTS:
                 try:
