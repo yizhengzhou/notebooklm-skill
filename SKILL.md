@@ -1,510 +1,270 @@
 ---
 name: notebooklm
 description: >
-  USE WHEN user mentions NotebookLM, shares notebooklm.google.com URLs,
-  asks to query notebooks/documentation, says "ask my docs", "check my notebook",
-  or wants to add sources to NotebookLM.
-  Queries Google NotebookLM for source-grounded, citation-backed answers from Gemini.
-  Browser automation via Patchright, notebook library management, persistent auth,
-  text source upload with auto-naming, notebook guide/persona configuration.
-  問我的文件, 查筆記本, 加資料到NotebookLM.
+  Create or adopt a Gemini Notebook / NotebookLM notebook as a cross-domain
+  Evergreen Advisor. Configure and verify a custom Persona, persist a Research
+  Profile and Watchlist, run resumable Deep Research previews, selectively apply
+  approved sources, safely retire replaced sources, refresh URL/Drive sources,
+  and export provider-neutral state. Use when the user mentions NotebookLM,
+  Gemini Notebook, evergreen research, a long-term AI advisor, source lifecycle,
+  Persona, assumption watch, or decision watch.
+metadata:
+  version: "2.0.0"
 ---
 
-# NotebookLM Research Assistant Skill
+# Evergreen Gemini Notebook Skill
 
-Interact with Google NotebookLM to query documentation with Gemini's source-grounded answers. Each question opens a fresh browser session, retrieves the answer exclusively from your uploaded documents, and closes.
+Build and maintain one long-lived, source-grounded Advisor Notebook. The
+`persona` field configures NotebookLM Custom Chat instructions; the current
+schema does not separately model an End-user Persona. The instructions may use
+any domain or user lens, but never inject a technical role unless the user asks
+for one.
 
-## When to Use This Skill
+## Runtime contract
 
-Trigger when user:
-- Mentions NotebookLM explicitly
-- Shares NotebookLM URL (`https://notebooklm.google.com/notebook/...`)
-- Asks to query their notebooks/documentation
-- Wants to add documentation to NotebookLM library
-- Uses phrases like "ask my NotebookLM", "check my docs", "query my notebook"
+- Use `notebooklm-py >=0.8.1,<0.9` through `GeminiNotebookBackend`.
+- Use `python -m notebooklm_skill.cli ...` as the supported entry point.
+- Do not use `scripts/`, Patchright, browser selectors, browser daemons, or the
+  old project-folder library for v2 operations.
+- Do not scan project folders, install Git hooks, enforce Research/Project pairs,
+  or auto-upload commits.
+- Chat Persona and Studio artifact generation instructions are separate. Never
+  claim that a Chat Persona automatically controls reports, slides, or audio.
+- If external web content must be fetched outside NotebookLM's own research
+  operation, use Crawl4AI.
 
-## ⚠️ CRITICAL: Add Command - Smart Discovery
+## Authentication
 
-When user wants to add a notebook without providing details:
-
-**SMART ADD (Recommended)**: Query the notebook first to discover its content:
-```bash
-# Step 1: Query the notebook about its content
-python scripts/run.py ask_question.py --question "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" --notebook-url "[URL]"
-
-# Step 2: Use the discovered information to add it
-python scripts/run.py notebook_manager.py add --url "[URL]" --name "[Based on content]" --description "[Based on content]" --topics "[Based on content]"
-```
-
-**MANUAL ADD**: If user provides all details:
-- `--url` - The NotebookLM URL
-- `--name` - A descriptive name
-- `--description` - What the notebook contains (REQUIRED!)
-- `--topics` - Comma-separated topics (REQUIRED!)
-
-NEVER guess or use generic descriptions! If details missing, use Smart Add to discover them.
-
-## Critical: Always Use run.py Wrapper
-
-**NEVER call scripts directly. ALWAYS use `python scripts/run.py [script]`:**
+Authentication belongs to `notebooklm-py`, not Advisor state:
 
 ```bash
-# ✅ CORRECT - Always use run.py:
-python scripts/run.py auth_manager.py status
-python scripts/run.py notebook_manager.py list
-python scripts/run.py ask_question.py --question "..."
-
-# ❌ WRONG - Never call directly:
-python scripts/auth_manager.py status  # Fails without venv!
+notebooklm login
+notebooklm auth check --test --json
 ```
 
-The `run.py` wrapper automatically:
-1. Creates `.venv` if needed
-2. Installs all dependencies
-3. Activates environment
-4. Executes script properly
+Credentials must never be copied into profile, registry, run, preview, plan, or
+export files.
 
-## Core Workflow
+## Create or adopt an Advisor
 
-### Step 1: Check Authentication Status
-```bash
-python scripts/run.py auth_manager.py status
+Prepare an input JSON file:
+
+```json
+{
+  "advisor_id": "market-watch",
+  "title": "Market Watch",
+  "persona": {
+    "instructions": "Act as an evidence-focused market research advisor. Separate facts, inference, conflict, and unknowns.",
+    "response_length": "longer"
+  },
+  "research": {
+    "enabled": true,
+    "brief": "Track meaningful market and competitor changes.",
+    "queries": ["What changed recently?", "What evidence challenges our assumptions?"],
+    "mode": "deep",
+    "language": "zh-Hant",
+    "recency_days": 90,
+    "max_new_sources_per_run": 10,
+    "preferred_domains": ["example.com"],
+    "update_mode": "review",
+    "deletion_mode": "confirm"
+  },
+  "watchlist": [
+    {
+      "watch_id": "watch-market",
+      "kind": "assumption",
+      "statement": "The current market premise remains supported.",
+      "questions": ["What new supporting or opposing evidence exists?"],
+      "revisit_when": ["A high-quality conflicting source appears"],
+      "status": "active"
+    }
+  ]
+}
 ```
 
-If not authenticated, proceed to setup.
-
-### Step 2: Authenticate (One-Time Setup)
-```bash
-# Browser MUST be visible for manual Google login
-python scripts/run.py auth_manager.py setup
-```
-
-**Important:**
-- Browser is VISIBLE for authentication
-- Browser window opens automatically
-- User must manually log in to Google
-- Tell user: "A browser window will open for Google login"
-
-### Step 3: Manage Notebook Library
-
-```bash
-# List all notebooks
-python scripts/run.py notebook_manager.py list
-
-# BEFORE ADDING: Ask user for metadata if unknown!
-# "What does this notebook contain?"
-# "What topics should I tag it with?"
-
-# Add notebook to library (ALL parameters are REQUIRED!)
-python scripts/run.py notebook_manager.py add \
-  --url "https://notebooklm.google.com/notebook/..." \
-  --name "Descriptive Name" \
-  --description "What this notebook contains" \  # REQUIRED - ASK USER IF UNKNOWN!
-  --topics "topic1,topic2,topic3"  # REQUIRED - ASK USER IF UNKNOWN!
-
-# Search notebooks by topic
-python scripts/run.py notebook_manager.py search --query "keyword"
-
-# Set active notebook
-python scripts/run.py notebook_manager.py activate --id notebook-id
-
-# Remove notebook
-python scripts/run.py notebook_manager.py remove --id notebook-id
-```
-
-### Quick Workflow
-1. Check library: `python scripts/run.py notebook_manager.py list`
-2. Ask question: `python scripts/run.py ask_question.py --question "..." --notebook-id ID`
-
-### Step 4: Ask Questions
+Create a new Notebook and apply/read back the Persona:
 
 ```bash
-# Basic query (uses active notebook if set)
-python scripts/run.py ask_question.py --question "Your question here"
-
-# Query specific notebook
-python scripts/run.py ask_question.py --question "..." --notebook-id notebook-id
-
-# Query with notebook URL directly
-python scripts/run.py ask_question.py --question "..." --notebook-url "https://..."
-
-# Show browser for debugging
-python scripts/run.py ask_question.py --question "..." --show-browser
-
-# Filter by category prefix (if sources are categorized)
-python scripts/run.py ask_question.py --question "Based only on [用戶痛點] sources, what are the top pain points?"
+python -m notebooklm_skill.cli setup --config advisor.json
 ```
 
-**Tip:** If the notebook has categorized sources (e.g., `[用戶痛點]`, `[競品分析]`), include the prefix in your question to focus the answer. See "Category Prefix System" below for details.
-
-## Follow-Up Mechanism (CRITICAL)
-
-Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need to know?"**
-
-**Required Claude Behavior:**
-1. **STOP** - Do not immediately respond to user
-2. **ANALYZE** - Compare answer to user's original request
-3. **IDENTIFY GAPS** - Determine if more information needed
-4. **CONSIDER CATEGORY FILTERS** - If the notebook has categorized sources, ask targeted questions per category (e.g., `[競品分析]`, `[用戶痛點]`) to get focused answers from each source group
-5. **ASK FOLLOW-UP** - If gaps exist, immediately ask:
-   ```bash
-   python scripts/run.py ask_question.py --question "Follow-up with context..."
-   ```
-6. **REPEAT** - Continue until information is complete
-7. **SYNTHESIZE** - Combine all answers before responding to user
-
-## Notebook Role Routing
-
-When a project has paired notebooks (role: research + project), route queries based on intent:
-
-| Question type | Route to | Examples |
-|--------------|----------|----------|
-| Why / market / users / competitors | `role: research` | "What are the top pain points?", "How do competitors handle X?" |
-| What / specs / decisions / versions | `role: project` | "What did we decide about the auth module?", "What's in v2.0?" |
-| Unclear | Query both, synthesize | "Give me an overview of where the project stands" |
-
-Agent should check `notebook_manager.py list` for role and paired_with fields to determine routing.
-
-## Understanding NotebookLM's Scope (IMPORTANT)
-
-NotebookLM is your project's **document manager** — it answers exclusively from uploaded sources, with citations. This is its strength, not a limitation. It means every answer is grounded in your actual research, not hallucinated.
-
-**When Gemini says "not in sources"**, tell the user clearly:
-
-> "NotebookLM only answers from documents you've uploaded. This question requires information that hasn't been added to the notebook yet. NotebookLM's best use is as your project's knowledge base — for questions outside its sources, we should research externally and then add the findings to make the notebook more complete."
-
-**Required agent behavior:**
-
-1. **Be transparent** — explain that NotebookLM answers only from uploaded documents. The user should understand this so they can use NotebookLM effectively even without this skill.
-2. **Don't stop at the gap** — research externally using web search, firecrawl, or other tools.
-3. **Offer to grow the knowledge base** — "I found the answer. Want me to add this to the notebook so it's available next time?"
-
-**Example flow:**
-```
-User: "What API does UtaTen use for search?"
-→ Agent queries NotebookLM → Gemini says "not in sources"
-→ Agent explains: "This isn't in the notebook yet — NotebookLM only knows what's been uploaded."
-→ Agent researches externally → finds the answer
-→ Agent offers: "Want me to add this to the notebook for future reference?"
-```
-
-**The notebook grows with your project.** Every gap found is a chance to make it more complete. Over time, most questions should be answerable from the notebook — that's the goal.
-
-## Script Reference
-
-### Authentication Management (`auth_manager.py`)
-```bash
-python scripts/run.py auth_manager.py setup    # Initial setup (browser visible)
-python scripts/run.py auth_manager.py status   # Check authentication
-python scripts/run.py auth_manager.py reauth   # Re-authenticate (browser visible)
-python scripts/run.py auth_manager.py clear    # Clear authentication
-```
-
-### Notebook Management (`notebook_manager.py`)
-```bash
-python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS
-python scripts/run.py notebook_manager.py list
-python scripts/run.py notebook_manager.py search --query QUERY
-python scripts/run.py notebook_manager.py activate --id ID
-python scripts/run.py notebook_manager.py remove --id ID
-python scripts/run.py notebook_manager.py stats
-```
-
-### Question Interface (`ask_question.py`)
-```bash
-python scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser] [--quiet]
-```
-
-**Performance flags:**
-- `--quiet` — Suppress all progress output; print only the raw answer. **Always use this in automated/agent workflows** to minimize token consumption.
-- Without `--show-browser`, headless mode uses fast JS input (no typing delay) and faster polling.
-- If the browser daemon is running, queries are routed through it automatically (no cold-start overhead).
-
-### Browser Daemon (Persistent Session)
-```bash
-python scripts/run.py daemon start [--timeout 600]  # Start daemon (auto-exits after idle timeout)
-python scripts/run.py daemon stop                     # Stop running daemon
-python scripts/run.py daemon status                   # Check daemon status
-```
-
-**When to use:** Start the daemon before a session with multiple NotebookLM queries. The daemon keeps a browser alive in the background, eliminating the ~5s cold-start per query. Queries automatically route through the daemon when it's running — no changes to `ask_question.py` calls needed.
-
-**How it works:**
-- Daemon launches headless Chromium once, keeps it alive
-- Reuses the same page/tab for repeated queries to the same notebook
-- Auto-exits after configurable idle timeout (default: 10 minutes)
-- Falls back gracefully to single-shot mode if daemon is not running
-- Log file: `/tmp/notebooklm-daemon.log`
-
-### Notebook Guide / Persona (`set_notebook_guide.py`)
-```bash
-# Set custom persona for a notebook
-python scripts/run.py set_notebook_guide.py --persona "You are a senior VC analyst..." [--response-length long] [--notebook-id ID] [--notebook-url URL] [--show-browser]
-
-# Response length options: default, long, short
-```
-**When to use:** When setting up a new project notebook, or when the user wants to change how NotebookLM responds. The persona shapes answer quality — a well-crafted guide makes responses dramatically more useful.
-
-**Agent workflow:** When creating a new project notebook, auto-generate a persona based on the project's goals and apply it automatically. Store the persona in the project's config for reproducibility.
-
-### Create Notebook (`create_notebook.py`)
-```bash
-# Create a single notebook
-python scripts/run.py create_notebook.py --name "My Notebook" [--role research|project] [--show-browser]
-
-# Create Research + Project pair (recommended for new projects)
-python scripts/run.py create_notebook.py --name "ProjectName" --pair [--show-browser]
-
-# Pair with persona tone: default (balanced), vc (investment lens), critic (harsh)
-python scripts/run.py create_notebook.py --name "ProjectName" --pair --tone vc [--show-browser]
-```
-**When to use:** When starting a new project that will use NotebookLM as its knowledge base. The `--pair` mode creates two linked notebooks with auto-configured personas following the planning/execution separation pattern (harness engineering). Use `--tone` to set how critically the personas evaluate your project.
-
-### Add Text Source (`add_source.py`)
-```bash
-# Add from file
-python scripts/run.py add_source.py --file path/to/document.md --notebook-id ID --title "Document Title" [--show-browser]
-
-# Add from text
-python scripts/run.py add_source.py --text "content here" --notebook-url URL --title "Title"
-
-# Add from stdin (pipe)
-cat document.md | python scripts/run.py add_source.py --notebook-id ID --title "Title"
-```
-**IMPORTANT:** Always provide `--title` — without it, the source appears as "貼上文字" in NotebookLM's source list, making it impossible to identify. Use a descriptive name (e.g., file name, topic, date).
-
-### Data Cleanup (`cleanup_manager.py`)
-```bash
-python scripts/run.py cleanup_manager.py                    # Preview cleanup
-python scripts/run.py cleanup_manager.py --confirm          # Execute cleanup
-python scripts/run.py cleanup_manager.py --preserve-library # Keep notebooks
-```
-
-## Environment Management
-
-The virtual environment is automatically managed:
-- First run creates `.venv` automatically
-- Dependencies install automatically
-- Chromium browser installs automatically
-- Everything isolated in skill directory
-
-Manual setup (only if automatic fails):
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-pip install -r requirements.txt
-python -m patchright install chromium
-```
-
-## Data Storage
-
-All data stored in `~/.claude/skills/notebooklm/data/`:
-- `library.json` - Notebook metadata
-- `auth_info.json` - Authentication status
-- `browser_state/` - Browser cookies and session
-
-**Security:** Protected by `.gitignore`, never commit to git.
-
-## Configuration
-
-Optional `.env` file in skill directory:
-```env
-HEADLESS=false           # Browser visibility
-SHOW_BROWSER=false       # Default browser display
-STEALTH_ENABLED=true     # Human-like behavior
-TYPING_WPM_MIN=160       # Typing speed
-TYPING_WPM_MAX=240
-DEFAULT_NOTEBOOK_ID=     # Default notebook
-```
-
-## Decision Flow
-
-```
-User mentions NotebookLM
-    ↓
-Check auth → python scripts/run.py auth_manager.py status
-    ↓
-If not authenticated → python scripts/run.py auth_manager.py setup
-    ↓
-Check/Add notebook → python scripts/run.py notebook_manager.py list/add (with --description)
-    ↓
-Activate notebook → python scripts/run.py notebook_manager.py activate --id ID
-    ↓
-Ask question → python scripts/run.py ask_question.py --question "..." --quiet
-    ↓
-See "Is that ALL you need?" → Ask follow-ups until complete
-    ↓
-Synthesize and respond to user
-```
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| ModuleNotFoundError | Use `run.py` wrapper |
-| Authentication fails | Browser must be visible for setup! --show-browser |
-| Rate limit (50/day) | Wait or switch Google account |
-| Browser crashes | `python scripts/run.py cleanup_manager.py --preserve-library` |
-| Notebook not found | Check with `notebook_manager.py list` |
-
-## Gotchas (Common Failure Points)
-
-These are real issues encountered during development. Read these BEFORE modifying any script.
-
-### Browser & Authentication
-- **Auth MUST use visible browser** — `headless=True` will fail for Google login. Always use `--show-browser` for `auth_manager.py setup`
-- **Use `python3` not `python`** — On macOS and RPi, `python` may not exist. Always use `python3` or the `run.py` wrapper
-- **Each query = new browser session (unless daemon is running)** — Without the daemon, every `ask_question.py` call opens a fresh browser and closes it after. Start the daemon (`python scripts/run.py daemon start`) to reuse browser sessions across queries
-- **`accessrequest` in URL = wrong account** — If the page redirects to an access request page, the `authuser` parameter doesn't match the logged-in account
-
-### Add Source (`add_source.py`)
-- **Always provide `--title`** — Without it, the source appears as "貼上的文字" in the source list, making it impossible to identify
-- **Don't use the "Add source" button** — The UI button detection is unreliable. Use `?addSource=true` URL parameter instead to open the dialog directly
-- **Title input in paste dialog does NOT set the source name** — The `input.title-input` in the paste dialog is cosmetic. The source always defaults to "貼上的文字". We rename it AFTER insertion via the three-dot menu
-- **Rename dialog input class is `title-input` not `rename-input`** — The overlay uses `input.title-input` inside `.cdk-overlay-pane`. Using wrong selector silently fails (returns true but doesn't rename)
-- **Focus lands on submit button, not input** — After clicking "重新命名來源", the active element is the submit button. Must explicitly `.click()` the input before `.fill()`
-- **Multiple sources with same name** — ~~If there are multiple "貼上的文字" sources, `querySelector` always picks the first one.~~ Fixed in v1.3.2: now uses `querySelectorAll` and picks the last (most recently added), with post-rename verification
-
-### DOM & Selectors
-- **NotebookLM uses Angular Material CDK** — Overlays, menus, and dialogs are in `.cdk-overlay-pane` containers, NOT inside the main page DOM tree
-- **Menu items are `[role="menuitem"]` buttons** — The three-dot menu items (重新命名來源, 移除來源) are buttons with `role="menuitem"` inside overlay panes
-- **Tab switching uses `[role="tab"]`** — Three tabs: 來源 (Sources), 對話 (Chat), 工作室 (Studio). Click the tab element directly
-- **Textarea injection needs native setter** — Angular's change detection doesn't fire with simple `.value =`. Must use `Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set` then dispatch `input` and `change` events
-- **Selectors may change without notice** — NotebookLM is actively developed. If a script suddenly fails, check selectors first with `--show-browser`
-
-### Rate Limits & Timing
-- **Free tier: ~50 queries/day** — Exceeding this silently fails or returns empty responses
-- **Random delays are required** — Without `StealthUtils.random_delay()` between actions, Google may detect automation and block the session
-- **Wait 5-7 seconds after Insert** — The source needs processing time before it appears in the source list for renaming
-
-## Source Curation Methodology (Experimentally Validated)
-
-Based on A/B testing conducted 2026-03-20 and weighting experiments conducted 2026-03-22, the following practices improve NotebookLM answer quality. See [`references/weighting-experiment.md`](references/weighting-experiment.md) for the full experiment report with methodology and results.
-
-### Category Prefix System
-
-Use `--category` parameter when adding sources to auto-prefix titles:
+Adopt an existing Notebook instead:
 
 ```bash
-# Auto-prefixes title as "[用戶痛點] Survey results..."
-python scripts/run.py add_source.py --category "用戶痛點" --title "Survey results" --text "..."
-
-# Auto-prefixes title as "[競品分析] LingoClip review..."
-python scripts/run.py add_source.py --category "競品分析" --title "LingoClip review" --file review.md
+python -m notebooklm_skill.cli setup \
+  --config advisor.json \
+  --adopt-notebook-id NOTEBOOK_ID
 ```
 
-When querying, reference categories in your question to focus the answer:
+Add or reconcile a user-supplied canonical URL and protect it as a seed source:
+
 ```bash
-python scripts/run.py ask_question.py --question "Based only on [用戶痛點] sources, what features should we build?"
+python -m notebooklm_skill.cli source-add-url \
+  --advisor-id market-watch \
+  --url https://example.com/canonical-guide \
+  --state pinned
 ```
 
-**Tested result:** Category-filtered queries produce more focused answers with direct user quotes. However, this is a "soft constraint" — NotebookLM may still reference other sources. It is not 100% reliable.
+The command canonicalizes tracking parameters, waits for `ready`, and writes the
+Source Registry only after backend verification. Re-run the same command after a
+timeout so it can reconcile an already-created source; never add a blind duplicate.
 
-### Recommended Category Prefixes
+Adoption registers existing sources as `active`; it never silently pins or
+retires them. Pin a core source explicitly:
 
-| Prefix | Use For |
-|--------|---------|
-| `[用戶痛點]` | User pain points, forum discussions, community feedback — sources about **what users need**, not about specific products |
-| `[競品分析]` | Competitor App Store reviews (both praise and complaints), feature comparisons, pricing — sources about **how competitors perform** |
-| `[學術研究]` | Academic papers, pedagogical research |
-| `[市場數據]` | Market size, trends, demographics |
-| `[產品規劃]` | Your own product specs, architecture docs |
-| `[LIVE]` | Official docs, API references, prompt guides, best practices — **sources that may become outdated**. When results seem off, re-import `[LIVE]` sources first before blaming AI randomness |
-
-**How to choose between `[用戶痛點]` and `[競品分析]`:** Prefixes are for **query filtering**, not content description. Ask: "Is this source telling me what users need, or how a competitor performs?" App Store reviews of competitors → `[競品分析]`. Reddit users describing their own frustrations (without referencing a specific product) → `[用戶痛點]`.
-
-### Source Upload Criteria (The Upload Gate)
-
-Before uploading ANY file, run it through the 4-gate decision framework: **Stability → Retrievability → Irreplaceability → Signal-to-Noise**. Full criteria and examples: [`references/source-upload-criteria.md`](references/source-upload-criteria.md)
-
-### Source Curation Principles
-
-1. **Sources should complement, not overlap.** Importing a Gemini Deep Research report into NotebookLM alongside NotebookLM's own Deep Research creates redundancy that suppresses unique insights from either source. (Experimentally confirmed: removing the overlapping source revealed different competitors and research that had been "crowded out".)
-
-2. **Deduplicate and weight before adding.** When Agent collects 30 forum posts about the same topic, consolidate into one weighted source (e.g., "Pain Point X — mentioned by 12/30 users, weight: highest") rather than adding all 30 raw posts. NotebookLM's answers reflect the weight annotations in priority ordering.
-
-3. **Keep source count manageable.** Fewer, high-quality curated sources produce better answers than many raw sources. Aim for 5-10 well-structured sources per research topic.
-
-### Weighting Best Practices (Experimentally Validated 2026-03-22)
-
-A 3-round controlled experiment confirmed that embedding weight annotations in source text influences Gemini's answer ranking. Key findings:
-
-1. **Weight tags work:** `[權重:最高]`, `[權重:高]`, `[權重:中]`, `[權重:低]` are read and reflected by Gemini
-2. **Pair with source counts:** `[權重:最高 — 8個來源提及]` is more persuasive than tags alone
-3. **Spread weights apart:** If two items share `[最高]`, Gemini falls back to its own judgment. Limit `[最高]` to 1-2 items for clear ranking effect
-4. **Include "why" explanations:** A `**為何權重最高：**` line after each section increases Gemini's confidence in following the ranking
-5. **Gemini may merge related items:** Closely related pain points with similar weights may be combined into a single answer — design sources with this in mind
-
-Full methodology, raw results, and limitations: [`references/weighting-experiment.md`](references/weighting-experiment.md)
-
-### Recommended Source Format
-
-For best results, structure curated sources with:
-- Clear headers per topic/pain point
-- Weight/frequency annotations (e.g., `[權重:最高 — N個來源提及]`)
-- `**為何權重X：**` explanation per section
-- Direct quotes with attribution
-- Summary/conclusion per section
-
-## Notebook Naming Convention (ENFORCED BY HOOK)
-
-A PreToolUse hook validates `--name` on every `create_notebook.py` and `notebook_manager.py add` command. Bad names are **blocked before execution**.
-
-### Rules
-1. **Minimum 3 characters** (after stripping `[Research]`/`[Project]` prefix)
-2. **No generic names**: test, notebook, untitled, new, temp, draft, sample, example
-3. **Descriptive**: name should indicate content, project, or purpose
-4. **Paired notebooks must share a project name** — use `--pair` which auto-prefixes `[Research]` and `[Project]`
-
-### Examples
 ```bash
-# ✅ Good names
---name "SingLingo"              # Project name
---name "華錦精密 AI 轉型策略"      # Descriptive topic
---name "App Market Radar Research 2026"  # Topic + year
-
-# ❌ Blocked by hook
---name "test"                   # Generic
---name "nb"                     # Too short
---name "Untitled"               # Generic
-# (no --name at all)            # Missing
+python -m notebooklm_skill.cli source-state \
+  --advisor-id market-watch --local-id src-ID --state pinned
 ```
 
-### For paired notebooks
-Always use `--pair` which enforces consistent naming:
+Persona setup failure is a failed setup even when the Notebook was created. Keep
+the returned Notebook ID and retry configuration; do not create a duplicate.
+
+Ask a source-grounded question directly or from a UTF-8 file:
+
 ```bash
-# Creates "[Research] ProjectName" + "[Project] ProjectName"
-python scripts/run.py create_notebook.py --name "MissionJP" --pair
+python -m notebooklm_skill.cli ask \
+  --advisor-id market-watch \
+  --question-file question.md
 ```
 
-## Best Practices
+Current limitation: this command returns answer text but does not preserve native
+reference objects or expose explicit fresh/follow-up conversation control. Do
+not use it as a controlled experiment or citation-audit interface.
 
-1. **Always use run.py** - Handles environment automatically
-2. **Check auth first** - Before any operations
-3. **Follow-up questions** - Don't stop at first answer
-4. **Browser visible for auth** - Required for manual login
-5. **Include context** - Each question is independent
-6. **Synthesize answers** - Combine multiple responses
-7. **Use --category for source organization** - Enables focused querying
-8. **Curate before adding** - Deduplicate, weight, and structure sources
+## Manual Evergreen cycle
 
-## Limitations
+### 1. Preview only
 
-- Rate limits on free Google accounts (50 queries/day)
-- Manual upload required (user must add docs to NotebookLM)
-- Without daemon: ~8s overhead per query (browser cold-start); with daemon: ~2-3s
+The query is composed from Research Profile, active Watch Items, recency, and
+last successful refresh. Preview starts or resumes one Deep Research task and
+must not mutate sources.
 
-## Resources (Skill Structure)
+```bash
+python -m notebooklm_skill.cli preview \
+  --advisor-id market-watch \
+  --run-id preview-20260822 \
+  --work-directory ./runs/preview-20260822
+```
 
-**Important directories and files:**
+On timeout, resume with the same run ID and directory. Do not start another
+research task.
 
-- `scripts/` - All automation scripts (ask_question.py, notebook_manager.py, etc.)
-- `data/` - Local storage for authentication and notebook library
-- `references/` - Extended documentation:
-  - `api_reference.md` - Detailed API documentation for all scripts
-  - `troubleshooting.md` - Common issues and solutions
-  - `usage_patterns.md` - Best practices and workflow examples
-  - `weighting-experiment.md` - Source weighting A/B test methodology and results
-  - `source-upload-criteria.md` - The Upload Gate: 4-gate decision framework for whether to upload a file
-- `.venv/` - Isolated Python environment (auto-created on first run)
-- `.gitignore` - Protects sensitive data from being committed
+### 2. Build a reviewed Apply Plan
+
+No retirements:
+
+```bash
+python -m notebooklm_skill.cli plan-apply \
+  --advisor-id market-watch \
+  --plan-id apply-20260822 \
+  --preview ./runs/preview-20260822/preview.json \
+  --selection ./runs/preview-20260822/selected-urls.json \
+  --output-directory ./runs/apply-20260822
+```
+
+`selected-urls.json` is an explicitly reviewed JSON array of candidate URLs.
+Selection may draw from the complete Preview candidate pool, including items
+initially marked `over_budget`, but its size cannot exceed the Preview source
+budget. This prevents ranking order from becoming blind import approval.
+
+A retirement file maps a registered local source ID to an approved replacement:
+
+```json
+{
+  "src-old": {
+    "replacement_url": "https://example.com/new",
+    "reason": "The approved primary source replaces this non-pinned source."
+  }
+}
+```
+
+Pass it with `--retirements retirements.json`. A pinned source cannot enter a
+retirement plan.
+
+### 3. Apply only an exact approved digest
+
+```bash
+python -m notebooklm_skill.cli apply \
+  --advisor-id market-watch \
+  --run-id refresh-20260822 \
+  --plan ./runs/apply-20260822/apply-plan.json \
+  --approved-digest SHA256 \
+  --evidence-directory ./runs/apply-20260822/evidence
+```
+
+Required order is add → ready → delta summary → backup → protected-set recheck →
+confirmed retirement. Any failure before backup/verification means zero deletes.
+Successful execution updates the registry, creates tombstones, and writes one
+immutable Refresh Run. Re-running the same run/digest reconciles instead of
+creating duplicate history.
+
+## Refresh existing URL or Drive sources
+
+Plan first:
+
+```bash
+python -m notebooklm_skill.cli refresh-plan \
+  --advisor-id market-watch \
+  --plan-id native-refresh-20260822 \
+  --output-directory ./runs/native-refresh-20260822
+```
+
+Apply an exact approved digest:
+
+```bash
+python -m notebooklm_skill.cli refresh-apply \
+  --advisor-id market-watch \
+  --run-id native-refresh-20260822 \
+  --plan ./runs/native-refresh-20260822/refresh-plan.json \
+  --approved-digest SHA256 \
+  --work-directory ./runs/native-refresh-20260822/execution
+```
+
+Use NotebookLM native refresh/sync only. Never implement refresh as delete and
+re-add. `missing`, `broken`, `syncing`, or unknown Drive states are warnings,
+not deletion evidence. Recheck freshness immediately before execution; if a
+stale plan has already auto-synced, record `already_fresh` and perform no RPC.
+
+## Inspect and export
+
+```bash
+python -m notebooklm_skill.cli show --advisor-id market-watch
+python -m notebooklm_skill.cli export \
+  --advisor-id market-watch \
+  --destination ./exports/market-watch
+```
+
+The export is backend-neutral and excludes credentials. Google Notebook, source,
+chat, and artifact IDs are provider references and may not migrate one-to-one.
+
+## Non-negotiable safety rules
+
+1. Add before delete.
+2. Pinned means protected.
+3. Missing is not obsolete.
+4. Never import all research results blindly.
+5. Formal source deletion requires an exact reviewed plan and explicit digest.
+6. Back up retirement metadata and available full text before deletion.
+7. Resume/reconcile after timeout; do not duplicate work.
+8. Record uncertain dates or freshness as unknown.
+9. Keep credentials separate from portable state.
+10. Disposable test resources are cleaned automatically after PASS; retain them
+    only after converting them into a named, owned asset with a stated purpose.
+
+## State location
+
+Default Advisor state:
+
+- macOS: `~/Library/Application Support/notebooklm-skill/advisors/`
+- Linux: `~/.local/share/notebooklm-skill/advisors/`
+- Windows: `%LOCALAPPDATA%/notebooklm-skill/advisors/`
+
+Set `NOTEBOOKLM_SKILL_HOME` to override the root. Tests must always inject a
+temporary state root.
+
+## Legacy v1
+
+The old `scripts/` directory is retained only for migration reference. It uses
+Patchright and is not part of the v2 runtime contract. Do not modify or invoke it
+unless the user explicitly requests legacy v1 maintenance.

@@ -10,5 +10,8 @@ __pycache__/
 *.pyo
 .env
 
+# Web research cache
+.firecrawl/
+
 # OS
 .DS_Store

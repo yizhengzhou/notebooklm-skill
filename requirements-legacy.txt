@@ -1,0 +1,4 @@
+# Legacy v1 Patchright scripts only. Not part of the v2 runtime contract.
+-r requirements.txt
+patchright==1.55.2
+python-dotenv==1.0.0

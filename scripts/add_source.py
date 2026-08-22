@@ -216,10 +216,10 @@ def add_text_source(
             # Step 2: Click "Copied text" option in the add source dialog
             print("  📋 Selecting 'Copied text'...")
             clicked = page.evaluate("""() => {
-                const btns = document.querySelectorAll('button');
+                const btns = document.querySelectorAll('button, div[role="button"], mat-card');
                 for (const b of btns) {
                     const t = b.textContent;
-                    if (t.includes('複製的文字') || t.includes('Copied text')) {
+                    if (t.includes('複製的文字') || t.includes('Copied text') || t.includes('文字') || t.includes('貼上') || t.includes('Text')) {
                         b.click();
                         return true;
                     }
@@ -234,11 +234,12 @@ def add_text_source(
 
             # Step 3: Inject text into textarea
             print("  ✍️ Injecting text content...")
-            textarea = page.query_selector(PASTE_TEXTAREA_SELECTOR)
-            if not textarea:
-                textarea = page.query_selector("textarea[placeholder*='貼上']")
-            if not textarea:
-                textarea = page.query_selector("textarea[placeholder*='Paste']")
+            try:
+                page.wait_for_selector("textarea, div[contenteditable='true']", timeout=8000)
+            except Exception:
+                pass
+
+            textarea = page.query_selector("textarea, div[contenteditable='true']")
 
             if not textarea:
                 return {"status": "error", "message": "Could not find paste textarea"}

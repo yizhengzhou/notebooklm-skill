@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `source-add-url` for canonical, ready-verified, timeout-reconcilable URL seed sources with optional pinned protection.
+- `ask` CLI command for direct or file-backed source-grounded Advisor questions.
+- Explicit reviewed URL selection before Apply, with full candidate-pool choice bounded by the Preview source budget.
+
+### Documentation
+- Added a complete user guide and current-status handoff.
+- Marked the Phase 5D Gauntlet Loop Persona experiment invalid; its conclusions are not product-value evidence.
+- Documented that `persona` currently means NotebookLM Custom Chat instructions and that `ask` does not yet preserve native references or explicit conversation controls.
+
+## [2.0.0] - 2026-08-22
+
+### Changed
+- Replaced the Patchright-first runtime with a thin `notebooklm-py 0.8.1` backend.
+- Repositioned the product as one cross-domain Evergreen Advisor instead of a forced per-project notebook pair.
+- Added a formal `notebooklm-evergreen` CLI for setup/adopt, source pinning, Deep Research preview, reviewed apply, native refresh, and portable export.
+- Moved Patchright scripts and dependencies behind an explicit Legacy v1 boundary.
+
+### Added
+- Versioned Advisor Profile, Persona, Research Profile, Watchlist, Source Registry, and immutable Refresh Run storage.
+- Resumable Deep Research preview with canonical URL dedupe, preferred domains, citation signal, and source budget.
+- Digest-bound selective apply with add-before-delete, pinned protection, backup-before-retirement, tombstones, and state commit.
+- Native URL/Drive freshness planning and timeout-safe reconciliation without delete + re-add.
+- Backend-aware export of readable source content without provider credentials.
+- Python 3.11/3.12 offline Fake Backend, contract, failure-injection, package, and CLI tests.
+
 ## [1.4.0] - 2026-03-24
 
 **Methodology update:** This release adopts the [harness engineering](https://openai.com/index/harness-engineering/) pattern emerging in 2026 — specifically the principle that planning and execution should be explicitly separated. We restructured the skill's core architecture from "one notebook per project" to "two notebooks per project" (Research + Project) to align with this methodology. / **方法論更新：** 本版本採用 2026 年興起的 [harness engineering](https://openai.com/index/harness-engineering/) 模式 — 特別是規劃與執行應明確分離的原則。我們將 skill 的核心架構從「一個專案一個筆記本」重構為「一個專案兩個筆記本」（Research + Project）以對齊此方法論。

@@ -1,10 +1,2 @@
-# NotebookLM Skill Dependencies
-# These will be installed in the skill's local .venv
-
-# Core browser automation with anti-detection
-# Note: After installation, run: patchright install chromium
-# (Chromium is used in headless mode; no macOS dock icon flash)
-patchright==1.55.2
-
-# Environment management
-python-dotenv==1.0.0
+# Thin Evergreen Notebook runtime, installed in editable mode for Skill development.
+-e .

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notebooklm-evergreen-skill"
+version = "2.0.0"
+description = "Review-first Evergreen Advisor orchestration for Gemini Notebook"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "notebooklm-py[browser]==0.8.1",
+]
+
+[project.scripts]
+notebooklm-evergreen = "notebooklm_skill.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["notebooklm_skill*"]

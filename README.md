@@ -1,487 +1,194 @@
-<div align="center">
+# Evergreen Gemini Notebook Skill
 
-**[English](README.md)** | **[繁體中文](README.zh-TW.md)**
+A thin, review-first orchestration layer for turning one Gemini Notebook /
+NotebookLM notebook into a long-lived, cross-domain research advisor.
 
-# NotebookLM Claude Code Skill
+The skill delegates Notebook operations to
+[`notebooklm-py`](https://github.com/teng-lin/notebooklm-py). It does not maintain
+NotebookLM DOM selectors, browser daemons, cookie workarounds, project-folder
+scanners, or Git hooks.
 
-**Turn NotebookLM into a per-project AI document manager for Claude Code**
+## What it does
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-purple.svg)](https://docs.anthropic.com/en/docs/claude-code/skills)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Experimental-orange.svg)]()
+- Create or adopt one Notebook.
+- Apply and read back a custom Persona and response length.
+- Persist a Research Profile and assumption/decision/trend/risk Watchlist.
+- Run resumable Deep Research previews without mutating sources.
+- Rank and selectively import reviewed candidates.
+- Protect pinned sources and enforce add-before-delete.
+- Back up replaced source content before confirmed retirement.
+- Refresh URL/Drive sources with native sync, never delete + re-add.
+- Record immutable refresh history and export provider-neutral state.
 
-> Two notebooks per project — one for research, one for execution. Each with its own expert persona. Your AI agent gets dedicated, source-grounded research partners that think like the experts you need — not a generic chatbot.
+Personas are domain-neutral: psychology, philosophy, medicine, markets, product,
+technology, or any combination. The current `persona` field means NotebookLM
+Custom Chat instructions; a separate End-user Persona model is not implemented.
+Studio artifact instructions remain separate from the Chat Persona.
 
-> **Note:** This skill is under active development and experimentation by [Fork](https://fork.work). We use it daily in our own projects and are open-sourcing it to share what we've learned. Expect rough edges — contributions and feedback are welcome.
+## Status and guides
 
-[Installation](#installation) • [Quick Start](#quick-start) • [Notebook Guide](#notebook-guide-persona-configuration) • [Commands](#commands)
+- [Current implementation status and handoff](docs/current-status.md)
+- [Complete user guide](docs/user-guide.md)
+- [Documentation index](docs/README.md)
 
-</div>
+The Phase 5D Gauntlet Loop Persona experiment is marked **invalid** and must not
+be used as product-value evidence. Its engineering additions remain tested.
 
----
+## Requirements
 
-## The Idea
-
-Most NotebookLM integrations treat it as a Q&A tool — you ask, it answers.
-
-This skill takes a different approach: **NotebookLM as a per-project knowledge base with planning/execution separation.**
-
-Inspired by [harness engineering](https://openai.com/index/harness-engineering/), each project gets a **Research notebook** (why we're building this) and a **Project notebook** (what we're building). Each has its own expert persona. The agent routes questions to the right notebook automatically.
-
-```
-MyProject
-├── [Research] Notebook  → Persona: Market Analyst  → "Top 3 pain points from 30 forum posts..."
-│   └── User pain points, competitor reviews, market data
-└── [Project] Notebook   → Persona: Product Manager → "Auth module uses OAuth, decided on 03/15..."
-    └── Product specs, architecture decisions, version history
-```
-
-**Key features:**
-- **Dual-notebook architecture** — one command creates Research + Project pair (`--pair`)
-- **Expert personas with tone presets** — balanced, VC lens, or harsh critic (`--tone`)
-- **Automatic query routing** — agent picks the right notebook based on question intent
-- **Headless automation** — query, create, and configure notebooks without opening a browser
-- **Source organization** — category prefixes, weight annotations, `[LIVE]` freshness tracking
-- **One-time auth** — log in once, sessions persist
-
----
-
-## Why NotebookLM?
-
-| Approach | Hallucinations | Setup | Token Cost |
-|----------|---------------|-------|------------|
-| Feed docs to Claude | Yes — fills gaps with invention | Instant | Very high |
-| Web search | High — unreliable sources | Instant | Medium |
-| Local RAG | Medium — retrieval gaps | Hours | Medium |
-| **NotebookLM Skill** | **Minimal — source-grounded** | **5 min** | **Minimal** |
-
-NotebookLM doesn't retrieve chunks — it **understands** your documents. It correlates across 50+ sources, provides citations, and says "I don't know" instead of hallucinating.
-
----
-
-## Philosophy: The Notebook as Project Interface
-
-Beyond source-grounded Q&A, we believe the notebook serves three distinct roles for a project:
-
-### 1. Knowledge Base — structured memory for agents
-
-The dual-notebook architecture (Research + Project) gives your agent a persistent, organized memory. Instead of re-researching the same questions, the agent queries the notebook and gets citation-backed answers from your accumulated research. Over time, most project questions become answerable from the notebook — that's the goal.
-
-### 2. Cognitive Feedback Loop — a mirror for your own thinking
-
-When you write a product spec and upload it to NotebookLM, then listen to the Audio Overview discuss it as a podcast, something shifts. You hear your own ideas from a third-person perspective. Blind spots surface. Assumptions get challenged. This isn't just a different output format — it's a different cognitive mode. Reading your spec is first-person thinking. Hearing two people debate it is third-person thinking. The gap between those two perspectives is where the best improvements come from.
-
-### 3. Conversational Entry Point — an interface for humans
-
-A project's file folder is for the developer. It's full of versioned files, config, and context that makes sense to the person who wrote it. For anyone else — a new team member, a collaborator, an investor — it's impenetrable.
-
-The notebook is the project's **human interface**. Anyone can open it and ask questions in natural language: "What does this project do?", "Why did we choose this architecture?", "What are the main risks?" They don't need to understand the folder structure, the git history, or the codebase. The notebook meets them where they are.
-
-This is why we treat the notebook as a first-class project artifact, not a side tool. It's the layer between raw project files and the people who need to understand them.
-
----
-
-## Installation
+- Python 3.11 or 3.12
+- `notebooklm-py 0.8.1`
+- A Google account that can use NotebookLM
 
 ```bash
-cd ~/.claude/skills
-git clone https://github.com/yizhengzhou/notebooklm-skill notebooklm
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/notebooklm login
+.venv/bin/notebooklm auth check --test --json
 ```
 
-Done. On first use, the skill auto-creates a `.venv`, installs dependencies, and sets up Chrome.
+## Quick start
 
-**Requirements:** Python 3.8+, local [Claude Code](https://github.com/anthropics/claude-code) (not web UI — sandbox blocks network access)
+Create `advisor.json`:
 
----
-
-## Quick Start
-
-### 1. Authenticate (one-time)
-
-```
-"Set up NotebookLM authentication"
-```
-
-A Chrome window opens. Log in with your Google account.
-
-### 2. Create a notebook
-
-Go to [notebooklm.google.com](https://notebooklm.google.com) → Create notebook → Upload your docs (PDFs, Google Docs, websites, YouTube videos).
-
-### 3. Add to library
-
-```
-"Add this NotebookLM to my library: https://notebooklm.google.com/notebook/..."
-```
-
-### 4. Ask questions
-
-```
-"What does my research say about competitive moat analysis?"
+```json
+{
+  "advisor_id": "market-watch",
+  "title": "Market Watch",
+  "persona": {
+    "instructions": "Act as an evidence-focused market advisor. Separate facts, inference, conflict, and unknowns.",
+    "response_length": "longer"
+  },
+  "research": {
+    "enabled": true,
+    "brief": "Track meaningful market and competitor changes.",
+    "queries": ["What changed recently?", "What challenges our assumptions?"],
+    "mode": "deep",
+    "language": "zh-Hant",
+    "recency_days": 90,
+    "max_new_sources_per_run": 10,
+    "preferred_domains": [],
+    "update_mode": "review",
+    "deletion_mode": "confirm"
+  },
+  "watchlist": []
+}
 ```
 
-Claude picks the right notebook, queries it, and uses the answer in context.
-
----
-
-## Notebook Guide (Persona Configuration)
-
-The most impactful feature. NotebookLM has a **Notebook Guide** setting that defines the AI's role and expertise. Find it at: `Chat → Customize → Notebook guide`. Without it, you get generic answers. With it, you get domain-expert analysis.
-
-### The difference
-
-| Without Guide | With Guide |
-|--------------|------------|
-| "Here are some market trends from your docs..." | "Based on the TAM/SAM analysis in your research, the addressable market shows a 23% gap in the utility app segment. Cross-referencing with the competitive density data, entry difficulty scores below 30, indicating a viable window for an MVP-first approach." |
-
-### Usage
+Create a Notebook:
 
 ```bash
-# Set persona via CLI
-python scripts/run.py set_notebook_guide.py \
-  --persona "You are a senior VC analyst..." \
-  --response-length long \
-  --notebook-id my-research
-
-# Or just tell Claude
-"Set the notebook guide to act as a VC analyst specializing in mobile app markets"
+.venv/bin/python -m notebooklm_skill.cli setup --config advisor.json
 ```
 
-**Arguments:**
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--persona` | Yes | Role/expertise description (max 10,000 chars) |
-| `--response-length` | No | `default`, `long`, or `short` |
-| `--notebook-url` | No | Target notebook URL |
-| `--notebook-id` | No | Notebook ID from library |
-| `--show-browser` | No | Show browser for debugging |
-
-### Persona Templates
-
-**Market Research / VC Analyst:**
-```
-You are a senior venture capital analyst and think tank strategist.
-Your knowledge base contains market research, trend reports, and competitive analysis.
-You evaluate opportunities using investment frameworks: TAM/SAM/SOM sizing,
-competitive moat analysis, and unit economics validation.
-When answering, challenge assumptions — ask whether the data is asking the right
-questions rather than accepting surface-level conclusions.
-All recommendations should target MVP validation with measurable outcomes.
-```
-
-**Technical Architecture Reviewer:**
-```
-You are a principal software architect with 15 years of experience in distributed systems.
-Your knowledge base contains API documentation, system design specs, and technical RFCs.
-Evaluate technical decisions through the lens of: scalability, maintainability,
-operational cost, and team capability constraints.
-Flag anti-patterns and suggest alternatives with concrete trade-off analysis.
-```
-
-**Product Manager:**
-```
-You are a senior product manager focused on user-centric design and data-driven decisions.
-Your knowledge base contains user research, analytics reports, and product specs.
-Prioritize insights using RICE scoring (Reach, Impact, Confidence, Effort).
-Always ground recommendations in user behavior data, not assumptions.
-```
-
-### Scaling: Dual-Notebook Architecture (Harness Engineering)
-
-Inspired by the [harness engineering](https://openai.com/index/harness-engineering/) pattern of separating planning from execution, we recommend creating a **Research + Project notebook pair** for each project:
+Or adopt an existing one:
 
 ```bash
-python scripts/run.py create_notebook.py --name "MyProject" --pair
+.venv/bin/python -m notebooklm_skill.cli setup \
+  --config advisor.json --adopt-notebook-id NOTEBOOK_ID
 ```
 
-This creates:
-- **[Research] MyProject** — market research, user pain points, competitor analysis
-- **[Project] MyProject** — product specs, version history, technical decisions
-
-```
-MyProject
-├── [Research] Notebook     → Persona: Market Analyst
-│   └── Why we're building this, who needs it, what competitors do
-└── [Project] Notebook      → Persona: Product Manager
-    └── What we're building, decisions made, version history
-```
-
-**Why separate?** When asking "what are the top pain points?", you want answers from research sources — not mixed with technical specs. When asking "what did we decide about auth?", you want project decisions — not competitor reviews. Role-based routing keeps answers focused.
-
-**Bonus:** The Project notebook doubles as a living pitch deck — use NotebookLM's built-in Audio Overview to generate project introductions for investors, clients, or team onboarding.
-
-#### Persona Tone Presets
-
-The `--pair` command auto-configures personas for both notebooks. Choose a tone that fits your project stage:
+Add and protect a canonical URL seed:
 
 ```bash
-# Balanced (default) — supportive analysis with evidence-based challenges
-python scripts/run.py create_notebook.py --name "MyProject" --pair
-
-# VC lens — evaluates like an investor (TAM/SAM, moats, unit economics)
-python scripts/run.py create_notebook.py --name "MyProject" --pair --tone vc
-
-# Harsh critic — finds fatal flaws, assumes optimism is wrong until proven
-python scripts/run.py create_notebook.py --name "MyProject" --pair --tone critic
+.venv/bin/python -m notebooklm_skill.cli source-add-url \
+  --advisor-id market-watch \
+  --url https://example.com/canonical-guide \
+  --state pinned
 ```
 
-| Tone | Research Persona | Project Persona | Best for |
-|------|-----------------|-----------------|----------|
-| `default` | Market research analyst | Product manager | Active development |
-| `vc` | VC analyst (investment lens) | VC partner (execution review) | Fundraising, pitch prep |
-| `critic` | Brutal market critic | Ruthless technical reviewer | Pre-launch stress testing |
-
-**Customize after creation:** These are starting points. Change the persona anytime with:
+Run a non-mutating research preview:
 
 ```bash
-python scripts/run.py set_notebook_guide.py --persona "Your custom persona..." --notebook-id ID
+.venv/bin/python -m notebooklm_skill.cli preview \
+  --advisor-id market-watch \
+  --run-id preview-20260822 \
+  --work-directory ./runs/preview-20260822
 ```
 
-### Best Practices
-
-1. **Be specific about the role** — "senior VC analyst" > "helpful assistant"
-2. **Reference the knowledge base** — Tell it what kind of documents are uploaded
-3. **Define the analysis framework** — TAM/SAM, RICE, SWOT, etc.
-4. **Set the challenge level** — Should it agree or push back on assumptions?
-5. **Align with output format** — What kind of answers does your project need?
-6. **Split large projects** — One notebook per feature/domain when source limits are hit
-
-### Project Integration
-
-Store the persona in your project config for automatic setup:
-
-```python
-# config.py or .env
-NOTEBOOKLM_NOTEBOOK_ID = "your-notebook-id"
-NOTEBOOKLM_PERSONA = """Your persona description..."""
-NOTEBOOKLM_RESPONSE_LENGTH = "long"
-```
-
-When an agent sets up a new project, it auto-generates a persona based on the project's goals, stores it in config, and applies it via `set_notebook_guide.py`.
-
----
-
-## Commands
-
-| What you say | What happens |
-|---|---|
-| "Set up NotebookLM authentication" | Opens Chrome for Google login |
-| "Add [link] to my NotebookLM library" | Saves notebook with metadata |
-| "Show my NotebookLM notebooks" | Lists all saved notebooks |
-| "Ask my docs about [topic]" | Queries the relevant notebook |
-| "Use the [name] notebook" | Sets active notebook |
-| "Set notebook guide to act as [role]" | Configures notebook persona |
-| "Clear NotebookLM data" | Fresh start (keeps library) |
-
-### Script Reference
+Build a review plan:
 
 ```bash
-# Query
-python scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--show-browser]
-
-# Set persona
-python scripts/run.py set_notebook_guide.py --persona "..." [--response-length long] [--notebook-id ID]
-
-# Library management
-python scripts/run.py notebook_manager.py list
-python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS
-python scripts/run.py notebook_manager.py activate --id ID
-python scripts/run.py notebook_manager.py remove --id ID
-
-# Authentication
-python scripts/run.py auth_manager.py setup    # Initial setup
-python scripts/run.py auth_manager.py status   # Check auth
-python scripts/run.py auth_manager.py reauth   # Re-authenticate
+.venv/bin/python -m notebooklm_skill.cli plan-apply \
+  --advisor-id market-watch \
+  --plan-id apply-20260822 \
+  --preview ./runs/preview-20260822/preview.json \
+  --selection ./runs/preview-20260822/selected-urls.json \
+  --output-directory ./runs/apply-20260822
 ```
 
----
-
-## Architecture
-
-```
-~/.claude/skills/notebooklm/
-├── SKILL.md                      # Instructions for Claude Code
-├── scripts/
-│   ├── run.py                    # Entry point (auto-creates venv)
-│   ├── ask_question.py           # Query NotebookLM
-│   ├── set_notebook_guide.py     # Configure notebook persona
-│   ├── notebook_manager.py       # Library management
-│   ├── auth_manager.py           # Google authentication
-│   ├── browser_utils.py          # Browser factory + stealth utils
-│   ├── browser_session.py        # Session management
-│   └── config.py                 # Selectors, paths, constants
-├── data/                         # Local storage (git-ignored)
-│   ├── library.json              # Notebook metadata
-│   ├── auth_info.json            # Auth status
-│   └── browser_state/            # Browser profile + cookies
-└── .venv/                        # Isolated Python env (auto-created)
-```
-
-**How it works:**
-1. Claude Code loads `SKILL.md` when you mention NotebookLM
-2. Runs the appropriate Python script via `run.py`
-3. Patchright opens a headless Chrome with persistent auth
-4. Interacts with NotebookLM's DOM (type question, read answer, configure settings)
-5. Returns the result to Claude Code
-
-**Tech stack:**
-- [Patchright](https://github.com/nickhath/patchright) — Playwright fork with anti-detection
-- Real Chrome (not Chromium) — better Google service compatibility
-- Human-like interaction patterns — realistic typing, random delays
-
----
-
-## Recommended Workflow: NotebookLM as Project Document Hub
-
-We built this skill around a specific philosophy: **NotebookLM should be the single source of truth for your project's accumulated knowledge.**
-
-Instead of searching through scattered markdown files, git logs, and chat histories, upload key documents to NotebookLM as they are created. Over time, your notebook becomes a queryable knowledge base of your project's full development history.
-
-### How it works in practice
-
-```
-You write a document (spec, research, meeting notes, architecture decision)
-    ↓
-Upload it to NotebookLM via add_source.py
-    ↓
-Tag it with a category prefix: [產品規劃], [用戶研究], [競品分析], etc.
-    ↓
-Later, ask your notebook instead of digging through files:
-  "What decisions did we make about the auth module and why?"
-  "Based on [用戶研究] sources, what are the top 3 pain points?"
-```
-
-### Tips for source management
-
-- **Upload as you go** — each new document requires one `add_source.py` call. There is no auto-sync (yet).
-- **Consolidate before uploading** — 30 small notes about the same topic should become 1 structured source with weight annotations, not 30 separate uploads.
-- **Use category prefixes** — prefix source titles with `[Category]` (e.g., `[用戶痛點] Forum analysis`). When querying, reference the category to focus answers.
-- **Stay under the source limit** — each notebook supports up to 50 sources. Quality over quantity.
-- **No update-in-place** — to update a source, remove the old one and re-add it.
-
-### Category prefix examples
-
-| Prefix | Use for |
-|--------|---------|
-| `[用戶痛點]` | User pain points, forum discussions, feedback |
-| `[競品分析]` | Competitor reviews, feature comparisons |
-| `[學術研究]` | Academic papers, pedagogical research |
-| `[市場數據]` | Market size, trends, demographics |
-| `[產品規劃]` | Product specs, architecture docs, decisions |
+Apply only after reviewing and approving the exact digest:
 
 ```bash
-# Upload with category
-python scripts/run.py add_source.py \
-  --category "產品規劃" \
-  --title "Auth module architecture decision" \
-  --file docs/auth-decision.md \
-  --notebook-id my-project
-
-# Query by category
-python scripts/run.py ask_question.py \
-  --question "Based only on [產品規劃] sources, what architecture decisions have we made?" \
-  --notebook-id my-project
+.venv/bin/python -m notebooklm_skill.cli apply \
+  --advisor-id market-watch \
+  --run-id refresh-20260822 \
+  --plan ./runs/apply-20260822/apply-plan.json \
+  --approved-digest SHA256 \
+  --evidence-directory ./runs/apply-20260822/evidence
 ```
 
-### Source freshness: the `[LIVE]` convention
+See [`SKILL.md`](SKILL.md) for the full Agent workflow and
+[`docs/`](docs/) for storage, preview, apply, refresh, testing, and local-runtime
+contracts.
 
-NotebookLM captures a source's content at upload time. If the original document updates (e.g., an API reference, a prompt engineering guide, a framework's best practices), NotebookLM **does not** re-fetch it. Your notebook silently becomes stale.
+## Safety model
 
-This is especially dangerous for sources that directly shape agent behavior — for example, if you uploaded a model's recommended prompt format and that format later changed, the agent will keep producing suboptimal prompts. You're likely to blame "AI randomness" rather than realizing your reference material is outdated.
+- **Add before delete**
+- **Pinned means protected**
+- **Missing is not obsolete**
+- **No blind import-all**
+- **No silent deletion**
+- **Backup before confirmed retirement**
+- **Resume/reconcile after timeout**
+- **Credentials never enter portable state**
 
-**Convention:** When adding sources that are likely to change over time, prefix them with `[LIVE]`:
+Disposable test resources are automatically cleaned after successful evidence
+capture. They are retained only when explicitly converted into a named,
+owned regression asset with a documented purpose.
+
+## Storage and portability
+
+Advisor state uses versioned JSON plus Markdown:
+
+```text
+advisors/<advisor_id>/
+├── profile.json
+├── persona.md
+├── watchlist.json
+├── sources.json
+└── refresh-runs/
+```
+
+Default root:
+
+- macOS: `~/Library/Application Support/notebooklm-skill/advisors/`
+- Linux: `~/.local/share/notebooklm-skill/advisors/`
+- Windows: `%LOCALAPPDATA%/notebooklm-skill/advisors/`
+
+Override it with `NOTEBOOKLM_SKILL_HOME`. Exports exclude credentials and are
+designed for a future non-Google backend.
+
+## Development
 
 ```bash
-python scripts/run.py add_source.py \
-  --category "LIVE" \
-  --title "NanoBanana prompt guide" \
-  --file nanob-guide.md \
-  --notebook-id my-project
+python3.11 -m pytest -q
+python3.12 -m pytest -q
+ruff check notebooklm_skill tests
 ```
 
-This is a naming convention only — there is no automatic refresh yet. But it serves as a visual reminder when you browse your source list: anything tagged `[LIVE]` should be periodically checked and re-imported if the original has changed.
+The suite is offline and uses an in-memory Fake Backend. Live tests are opt-in,
+use disposable resources, and must clean them after PASS.
 
----
+## Legacy v1
 
-## Limitations
+The old Patchright implementation remains in `scripts/` only as migration
+reference. It is not part of the v2 runtime contract and is not installed by
+`requirements.txt`. Install `requirements-legacy.txt` only when explicitly
+maintaining v1.
 
-- **Local Claude Code only** — web UI sandbox blocks network access
-- **No session persistence** — each question opens a fresh browser
-- **NotebookLM rate limits** — free tier has daily query limits
-- **Manual upload** — each document requires an `add_source.py` call (no auto-sync yet)
+## Scope
 
----
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Skill not found | Verify `~/.claude/skills/notebooklm/SKILL.md` exists |
-| Authentication fails | `"Reset NotebookLM authentication"` |
-| Browser crashes | `"Clear NotebookLM browser data"` |
-| Rate limited | Wait or switch Google account |
-| Dependencies broken | Delete `.venv/`, next run auto-recreates it |
-
----
-
-## Security
-
-- All data stays local on your machine
-- Google credentials stored in `data/browser_state/` (git-ignored)
-- No external API calls — only browser automation to notebooklm.google.com
-- Recommended: use a dedicated Google account for automation
-
----
-
-## Roadmap
-
-### Near-term
-
-- **Source Export (`export_sources.py`)** — Download all sources from a notebook back to your local project folder. Insurance against Google's [track record](https://killedbygoogle.com/) of shutting down free services. Your knowledge shouldn't be locked inside any single platform.
-
-- **Live Source Refresh (`refresh_sources.py`)** — Some sources are "alive" (industry blogs, official docs, trend reports) — their content updates over time, but NotebookLM only captures what was there when you first added them. This feature would let you tag sources as `[LIVE]`, then periodically re-import them so your notebook's knowledge stays current.
-
-### Long-term Vision
-
-The methodology behind this skill — dual-notebook architecture, source weighting, category prefixes, persona-driven analysis — is designed to be **platform-independent**. NotebookLM is the current implementation because it's excellent and free, but the patterns should survive the tool.
-
-We're exploring an open-source, self-hosted alternative that would bring the same methodology locally:
-- **Knowledge base** — structured, source-grounded project memory that any agent can query
-- **Cognitive feedback** — multi-format output (audio discussion, briefing docs, Q&A) for reviewing your own thinking from different angles
-- **Conversational interface** — anyone can ask the project questions without navigating raw files
-- **Full data ownership** — no dependency on external services
-
-Until then, Source Export ensures your data is never locked in.
-
----
-
-## What's New
-
-This skill evolves with the latest AI agent methodologies. We actively incorporate new patterns as the field develops.
-
-| Version | Date | Highlights |
-|---------|------|------------|
-| **1.4.0** | 2026-03-24 | Auto-create notebooks via browser automation. **Dual-notebook architecture** inspired by [harness engineering](https://openai.com/index/harness-engineering/) — separates research (planning) from project (execution) knowledge. Persona tone presets (`--tone vc`, `--tone critic`). `[LIVE]` source freshness convention. |
-| **1.3.2** | 2026-03-22 | Source rename fix (targets correct element). Category prefix decision guide (`[用戶痛點]` vs `[競品分析]`). Source weighting experiment results. |
-| **1.3.1** | 2026-03-21 | Multi-account authentication fix. Wrong Google account detection and diagnosis. |
-| **1.0.0** | 2026-03-21 | Initial public release. Modular architecture, browser automation, notebook library, persona configuration, authentication. |
-
-See [CHANGELOG.md](CHANGELOG.md) for full details.
-
----
-
-## Credits
-
-- [NotebookLM MCP Server](https://github.com/PleasePrompto/notebooklm-mcp) by **PleasePrompto** — the original implementation that inspired this skill
-- **[@blazingzebra](https://x.com/blazingzebra)** — the category prefix technique for organizing NotebookLM sources
-- **[@Tool_Drop_1](https://youtube.com/@Tool_Drop_1)** — NotebookLM tips and workflows
-- **[Steven Johnson](https://x.com/stevenbjohnson)** — NotebookLM Editorial Director, whose vision for the product shaped how we think about source-grounded AI
-
----
-
-## License
-
-MIT
-
-</div>
+Scheduling (`launchd`, cron, Task Scheduler), an Open Notebook backend, automatic
+project-folder upload, Git hooks, and Studio artifact generation are outside the
+v2.0 MVP.
