@@ -1,9 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
-from dataclasses import dataclass
 from notebooklm import ChatGoal, ChatResponseLength
 from notebooklm.types import (
     ResearchSource,
@@ -13,17 +13,17 @@ from notebooklm.types import (
     SourceFulltext,
 )
 
+from notebooklm_skill.advisor import AdvisorService, PersonaSetupError
+from notebooklm_skill.backend import ChatConfig, NotebookBackend
+from notebooklm_skill.gemini_backend import GeminiNotebookBackend, PersonaVerificationError
+from tests.fake_backend import FakeNotebookBackend
+
 
 @dataclass
 class ChatSettings:
     goal: ChatGoal
     response_length: ChatResponseLength
     custom_prompt: str
-
-from notebooklm_skill.advisor import AdvisorService, PersonaSetupError
-from notebooklm_skill.backend import ChatConfig, NotebookBackend
-from notebooklm_skill.gemini_backend import GeminiNotebookBackend, PersonaVerificationError
-from tests.fake_backend import FakeNotebookBackend
 
 
 class StubNotebooksAPI:

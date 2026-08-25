@@ -11,7 +11,7 @@ from pathlib import Path
 from notebooklm_skill.advisor import AdvisorService, AdvisorSetup
 from notebooklm_skill.apply_executor import ApplyExecutor, ApplyResult
 from notebooklm_skill.apply_plan import verify_apply_plan
-from notebooklm_skill.backend import AskResponse, CitationReference, NotebookBackend
+from notebooklm_skill.backend import AskResponse, NotebookBackend
 from notebooklm_skill.export import export_bundle
 from notebooklm_skill.models import (
     AdvisorProfile,
