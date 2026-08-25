@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from notebooklm_skill.apply_plan import build_apply_plan, write_apply_plan
-from notebooklm_skill.evergreen import EvergreenService, load_setup_document
+from notebooklm_skill.evergreen import EvergreenService, format_answer_with_citations, load_setup_document
 from notebooklm_skill.gemini_backend import GeminiNotebookBackend
 from notebooklm_skill.preview import read_preview_plan
 from notebooklm_skill.refresh import RefreshPlanner, read_refresh_plan, write_refresh_plan
@@ -172,8 +172,20 @@ async def run(args: argparse.Namespace) -> int:
             if args.question_file is not None
             else args.question
         )
-        answer = await service.ask(args.advisor_id, question)
-        _print({"advisor_id": args.advisor_id, "question": question.strip(), "answer": answer})
+        ask_res = await service.ask(args.advisor_id, question)
+        profile, _, sources = store.load(args.advisor_id)
+        formatted = format_answer_with_citations(ask_res, sources)
+        _print(
+            {
+                "advisor_id": args.advisor_id,
+                "question": question.strip(),
+                "answer": ask_res.answer,
+                "formatted_answer": formatted,
+                "conversation_id": ask_res.conversation_id,
+                "turn_number": ask_res.turn_number,
+                "citations_count": len(ask_res.references),
+            }
+        )
     elif args.command == "preview":
         plan = await service.preview(
             advisor_id=args.advisor_id,

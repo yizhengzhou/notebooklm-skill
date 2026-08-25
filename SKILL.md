@@ -128,9 +128,11 @@ python -m notebooklm_skill.cli ask \
   --question-file question.md
 ```
 
-Current limitation: this command returns answer text but does not preserve native
-reference objects or expose explicit fresh/follow-up conversation control. Do
-not use it as a controlled experiment or citation-audit interface.
+See "Ask and verify citations" below for structured reference objects and
+citation footnotes. `ask` still does not expose explicit fresh/follow-up
+conversation control; without a specified conversation ID it continues the
+current conversation, so do not treat consecutive `ask` calls as independent
+questions.
 
 ## Manual Evergreen cycle
 
@@ -225,6 +227,18 @@ Use NotebookLM native refresh/sync only. Never implement refresh as delete and
 re-add. `missing`, `broken`, `syncing`, or unknown Drive states are warnings,
 not deletion evidence. Recheck freshness immediately before execution; if a
 stale plan has already auto-synced, record `already_fresh` and perform no RPC.
+
+## Ask and verify citations
+
+Ask questions and automatically receive structured citation footnotes with highlighted passage offsets:
+
+```bash
+python -m notebooklm_skill.cli ask \
+  --advisor-id market-watch \
+  --question "What is the primary constraint identified in the sources?"
+```
+
+Output includes `answer`, `conversation_id`, `turn_number`, and `formatted_answer` with grounded source quotes and character ranges.
 
 ## Inspect and export
 

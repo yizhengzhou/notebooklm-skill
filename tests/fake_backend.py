@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from notebooklm_skill.backend import (
+    AskResponse,
     BackendCapabilities,
     ChatConfig,
+    CitationReference,
     NotebookRef,
     ResearchCandidate,
     ResearchPollResult,
@@ -189,11 +191,24 @@ class FakeNotebookBackend:
             url=source.url,
         )
 
-    async def ask(self, notebook_id: str, question: str) -> str:
+    async def ask(self, notebook_id: str, question: str) -> AskResponse:
         self.events.append("ask")
         if self.fail_ask:
             raise RuntimeError("injected ask failure")
-        return "Delta summary"
+        return AskResponse(
+            answer="Delta summary",
+            conversation_id="fake-conv-1",
+            turn_number=1,
+            references=(
+                CitationReference(
+                    source_id="source-1",
+                    citation_number=1,
+                    cited_text="Pinned content",
+                    start_char=0,
+                    end_char=14,
+                ),
+            ),
+        )
 
     async def delete_source(self, notebook_id: str, source_id: str) -> None:
         self.events.append(f"delete:{source_id}")

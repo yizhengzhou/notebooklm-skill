@@ -291,7 +291,7 @@ Replacement 必須是本次選入來源；Pinned source 不能進入 retirement 
 
 `missing`、`broken`、`syncing` 或 unknown 不代表 obsolete，也不會自動取得刪除許可。
 
-## 13. Ask
+## 13. Ask 與引用查驗 (Citation & Highlight Fidelity)
 
 直接提問：
 
@@ -309,13 +309,34 @@ Replacement 必須是本次選入來源；Pinned source 不能進入 retirement 
   --question-file question.md
 ```
 
-### 目前限制
+### 結構化輸出與 Highlight 出處對照表
 
-- CLI 目前只輸出 answer string，尚未保存原生 citation/reference objects。
-- 未指定 conversation ID 時會延續 Notebook 的 current conversation。
-- CLI 尚未提供 explicit fresh-conversation mode。
+`ask` 指令會自動解析 NotebookLM 後端回傳的原文引用座標（包含字元區間、被引用文字片段與來源 ID），並在輸出中提供結構化的 `formatted_answer`，自動於回答末尾追加 Markdown 格式的對照表：
 
-因此這個命令目前適合基本操作，不適合需要嚴格 citation audit 或獨立實驗條件的工作。
+```json
+{
+  "advisor_id": "gauntlet-loop",
+  "question": "根據來源，Gauntlet Loop 最重要的限制是什麼？",
+  "answer": "Gauntlet Loop 需要先通過可玩性測試 [1]...",
+  "formatted_answer": "Gauntlet Loop 需要先通過可玩性測試 [1]...\n\n---\n\n### 📚 引用出處與原文對照表 (Citations & Highlights)\n- **[1] RoboNuggets Gauntlet Loop** (https://github.com/...)\n  > \"Critic must evaluate candidates with fresh context...\"",
+  "conversation_id": "b2f00a7b-3748-4092-b29d-82d048e764cf",
+  "turn_number": 1,
+  "citations_count": 5
+}
+```
+
+### 高可信度 Persona 設計最佳實務 (Strict Grounding)
+
+為避免模型在研究過程中產生未經證實的因果跳躍或反向否認幻覺，建議在 `advisor.json` 的 `persona.instructions` 中加入以下嚴格約束範本：
+
+```text
+【最高原則：嚴格依據來源與不可妥協的可核查性】
+1. 答案必須 100% 嚴格僅依據 Notebook 中提供的來源資料，嚴禁任何來源外的推論、猜測、腦補或外部知識外推。
+2. 每一個事實主張與規範條目，都必須明確標記引用來源（註明來源標題、日期或版本）。
+3. 嚴格區分 MUST/SHOULD、實作指引與未知；若來源未提及，必須直接明確回答「來源未提及」或「未知」，絕對不可自行建立因果關係。
+4. 在進行自我審核時，必須忠實反映來源字面內容，嚴禁否認來源中實際存在的文字。
+5. 嚴禁聲稱自己已執行任何程式碼修改、檔案建立或系統部署動作。
+```
 
 ## 14. Export
 

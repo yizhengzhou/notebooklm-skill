@@ -9,8 +9,10 @@ from notebooklm import ChatGoal, ChatResponseLength, NotebookLMClient
 from notebooklm.research import select_cited_sources
 
 from notebooklm_skill.backend import (
+    AskResponse,
     BackendCapabilities,
     ChatConfig,
+    CitationReference,
     NotebookRef,
     ResearchCandidate,
     ResearchPollResult,
@@ -170,9 +172,9 @@ class GeminiNotebookBackend:
                 title=source.title,
                 url=source.url,
                 cited=id(source) in cited_ids,
-                ordinal=source.source_ordinal,
+                ordinal=getattr(source, "source_ordinal", idx + 1),
             )
-            for source in result.sources
+            for idx, source in enumerate(result.sources)
             if source.url.startswith(("http://", "https://"))
         )
         return ResearchPollResult(
@@ -244,10 +246,33 @@ class GeminiNotebookBackend:
             url=fulltext.url,
         )
 
-    async def ask(self, notebook_id: str, question: str) -> str:
+    async def ask(
+        self,
+        notebook_id: str,
+        question: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AskResponse:
         async with self._client_factory() as client:
-            result = await client.chat.ask(notebook_id, question)
-        return result.answer
+            result = await client.chat.ask(notebook_id, question, conversation_id=conversation_id)
+        refs: list[CitationReference] = []
+        for r in getattr(result, "references", []) or []:
+            refs.append(
+                CitationReference(
+                    source_id=getattr(r, "source_id", ""),
+                    citation_number=getattr(r, "citation_number", None),
+                    cited_text=getattr(r, "cited_text", None),
+                    start_char=getattr(r, "start_char", None),
+                    end_char=getattr(r, "end_char", None),
+                    chunk_id=getattr(r, "chunk_id", None),
+                )
+            )
+        return AskResponse(
+            answer=result.answer,
+            conversation_id=getattr(result, "conversation_id", None),
+            turn_number=getattr(result, "turn_number", 1),
+            references=tuple(refs),
+        )
 
     async def delete_source(self, notebook_id: str, source_id: str) -> None:
         async with self._client_factory() as client:

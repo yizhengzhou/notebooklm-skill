@@ -3,15 +3,22 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
+from dataclasses import dataclass
 from notebooklm import ChatGoal, ChatResponseLength
 from notebooklm.types import (
-    ChatSettings,
     ResearchSource,
     ResearchStart,
     ResearchStatus,
     ResearchTask,
     SourceFulltext,
 )
+
+
+@dataclass
+class ChatSettings:
+    goal: ChatGoal
+    response_length: ChatResponseLength
+    custom_prompt: str
 
 from notebooklm_skill.advisor import AdvisorService, PersonaSetupError
 from notebooklm_skill.backend import ChatConfig, NotebookBackend
@@ -52,8 +59,19 @@ class StubChatAPI:
     async def get_settings(self, notebook_id: str) -> ChatSettings:
         return self.settings[notebook_id]
 
-    async def ask(self, notebook_id: str, question: str) -> SimpleNamespace:
-        return SimpleNamespace(answer="Delta summary")
+    async def ask(
+        self,
+        notebook_id: str,
+        question: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            answer="Delta summary",
+            conversation_id="conv-1",
+            turn_number=1,
+            references=[],
+        )
 
 
 class StubSourcesAPI:
@@ -131,7 +149,7 @@ class StubResearchAPI:
             task_id,
             ResearchStatus.COMPLETED,
             query="query",
-            sources=(ResearchSource(url=url, title="New source", source_ordinal=1),),
+            sources=(ResearchSource(url=url, title="New source"),),
             summary="Summary",
             report=f"Evidence: [New source]({url})",
         )

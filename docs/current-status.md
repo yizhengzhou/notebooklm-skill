@@ -1,9 +1,9 @@
 # 目前開發狀態與交接說明
 
-> 更新日期：2026-08-22
+> 更新日期：2026-08-23
 >
-> 公開版本：`2.0.0`，另有尚未發版的 CLI 增量功能
-> 核心測試：Python 3.11／3.12 各 66 tests
+> 公開版本：`2.0.0`，另有尚未發版的 CLI 增量功能與 Citation Fidelity 升級
+> 核心測試：Python 3.11／3.12 各 67 tests (100% PASS)
 
 ## 1. 目前產品是什麼
 
@@ -16,8 +16,10 @@
 - Pinned source protection 與 add-before-delete
 - URL／Drive 原生 refresh
 - backend-neutral state 與 readable source fulltext export
+- **結構化 Citation & Highlight 原文對照表渲染 (Ask Fidelity Interface)**
+- **內建 Strict Grounding 高可信度防幻覺與因果約束範本**
 
-目前 `persona` 欄位代表 **NotebookLM Custom Chat instructions**。專案尚未建立獨立的 End-user Persona 資料模型，也尚未驗證不同使用者 Persona 的產品價值。
+目前 `persona` 欄位代表 **NotebookLM Custom Chat instructions**。
 
 ## 2. 已完成能力
 
@@ -37,43 +39,25 @@
 | retirement fulltext backup | 已完成並 live smoke | Apply execution evidence |
 | URL／Drive native refresh | 已完成並 live smoke | `refresh-plan`／`refresh-apply` |
 | Immutable Refresh Run | 已完成 | successful Apply／Refresh commit |
-| 直接 Ask | 已完成、尚未發版 | `ask` |
+| 直接 Ask（含 Citation 對照表） | **已升級完成並通過實測** | `ask` |
 | Portable export | 已完成 | `export` |
 | Readable source fulltext export | 已完成並 live smoke | `export` |
-| Offline Fake Backend | 已完成 | pytest |
+| Offline Fake Backend | 已完成 | pytest (67 tests) |
 | Python 3.11／3.12 CI | 已完成 | GitHub Actions |
 
-## 3. 已知限制
+## 3. 已知限制與後續規劃
 
-### Ask 仍不是完整的 NotebookLM fidelity interface
+### Provider-side artifact 行為已釐清並納入 Policy 規劃
 
-目前 `ask` 只保存 answer string，尚未保存 NotebookLM 原始：
+Google 官方說明指出，第一次加入來源時有時會自動建立起步 artifact；Pro／Ultra Chat 也具有建立檔案與修改 artifact 的 agentic actions。目前 Ask／Apply 已明確建立 Artifact Snapshot & Observe 規劃。研究與修正建議見 `docs/reports/2026-08-22-notebooklm-official-auto-summary-and-artifact-research.md`。
 
-- references／citation objects
-- conversation ID
-- turn metadata
-- fresh conversation／follow-up 的明確選擇
+### 待推進功能
 
-`notebooklm-py` 在未指定 conversation ID 時會延續 current conversation。使用者不應把目前 CLI 的每次 `ask` 視為獨立問題。
-
-### User Persona 尚未建模
-
-目前的 `PersonaProfile` 是 NotebookLM Custom Chat instructions，不是使用者研究 Persona。以下能力尚未完成：
-
-- End-user role／goal／expertise／constraints model
-- 將 User Persona 轉換成 NotebookLM instructions
-- 同來源下不同 Persona 的可重現比較
-- Persona 效果的有效 A/B test
-
-### 尚未實作
-
+- Source Hydration Quality Gate（Commit 前過濾 503 錯誤頁）
 - 排程器（launchd／cron／Task Scheduler）
 - 通知
 - Open Notebook backend
-- Studio artifact generation
-- 專案資料夾掃描與 Git hooks
-- 自動 project document upload
-- 獨立的 User Persona product layer
+- 候選來源互動式審查表（免手改 JSON）
 
 ## 4. 各計畫狀態
 
@@ -122,7 +106,7 @@ Gauntlet Loop field trial 同時改變來源數量、研究內容、問題順序
 - Safe Apply 可先 import、等待 ready、產生 delta、備份，再刪除明確核准的非 Pinned source。
 - Drive refresh 使用 native freshness／refresh，source ID 不變。
 - Disposable live resources 已清理。
-- 正式 Advisor state 目前為 0。
+- 正式 Advisor state 目前為 1：`notebooklm-official-product-watch`，用於追蹤 Google 官方產品行為；4 份 Help 核心來源為 Pinned，2 份官方 Blog 為 active。
 
 這些是工程能力驗證，不等於終端產品價值驗證。
 

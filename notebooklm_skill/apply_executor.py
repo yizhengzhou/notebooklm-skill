@@ -120,11 +120,12 @@ class ApplyExecutor:
         if summary_path.is_file() and summary_path.read_text(encoding="utf-8").strip():
             summary = summary_path.read_text(encoding="utf-8").strip()
         else:
-            summary = await self.backend.ask(
+            ask_res = await self.backend.ask(
                 notebook_id,
                 "根據目前所有來源，說明本次新加入來源相對於既有來源帶來哪些變化。"
                 "區分已確認事實、推論、衝突與未知資訊，並指出仍需查證的部分。",
             )
+            summary = ask_res.answer if hasattr(ask_res, "answer") else str(ask_res)
             _atomic_write(summary_path, (summary.strip() + "\n").encode())
 
         backups: dict[str, tuple[Path, Path]] = {}

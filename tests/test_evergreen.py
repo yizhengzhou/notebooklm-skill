@@ -450,3 +450,40 @@ def test_native_refresh_commits_verification_timestamp_and_history(tmp_path: Pat
         assert len(store.load_refresh_runs("advisor-001")) == 1
 
     asyncio.run(scenario())
+
+
+def test_format_answer_with_citations(tmp_path: Path) -> None:
+    from notebooklm_skill.backend import AskResponse, CitationReference
+    from notebooklm_skill.evergreen import format_answer_with_citations
+    from notebooklm_skill.models import SourceRecord
+
+    res = AskResponse(
+        answer="According to the spec [1], authorization discovery is mandatory.",
+        conversation_id="conv-123",
+        turn_number=1,
+        references=(
+            CitationReference(
+                source_id="src-backend-1",
+                citation_number=1,
+                source_title="MCP Spec 2025",
+                cited_text="MCP clients MUST support discovery.",
+                start_char=100,
+                end_char=136,
+            ),
+        ),
+    )
+    sources = (
+        SourceRecord(
+            local_id="src-001",
+            backend_source_id="src-backend-1",
+            title="MCP Spec 2025",
+            state="active",
+            origin="manual",
+            url="https://example.com/spec",
+        ),
+    )
+    formatted = format_answer_with_citations(res, sources)
+    assert "[1] MCP Spec 2025" in formatted
+    assert "https://example.com/spec" in formatted
+    assert "字元 100–136" in formatted
+    assert "MCP clients MUST support discovery." in formatted

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 ResponseLength = Literal["default", "longer", "shorter"]
 
@@ -78,6 +78,40 @@ class ResearchPollResult:
     report: str = ""
 
 
+@dataclass(frozen=True)
+class CitationReference:
+    source_id: str
+    citation_number: int | None = None
+    source_title: str | None = None
+    cited_text: str | None = None
+    start_char: int | None = None
+    end_char: int | None = None
+    chunk_id: str | None = None
+
+
+@dataclass(frozen=True)
+class AskResponse:
+    answer: str
+    conversation_id: str | None = None
+    turn_number: int = 1
+    references: tuple[CitationReference, ...] = ()
+
+    def __str__(self) -> str:
+        return self.answer
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, str):
+            return self.answer == other
+        if isinstance(other, AskResponse):
+            return (
+                self.answer == other.answer
+                and self.conversation_id == other.conversation_id
+                and self.turn_number == other.turn_number
+                and self.references == other.references
+            )
+        return False
+
+
 class NotebookBackend(Protocol):
     backend_type: str
     capabilities: BackendCapabilities
@@ -121,7 +155,7 @@ class NotebookBackend(Protocol):
 
     async def get_source_content(self, notebook_id: str, source_id: str) -> SourceContent: ...
 
-    async def ask(self, notebook_id: str, question: str) -> str: ...
+    async def ask(self, notebook_id: str, question: str) -> AskResponse: ...
 
     async def delete_source(self, notebook_id: str, source_id: str) -> None: ...
 

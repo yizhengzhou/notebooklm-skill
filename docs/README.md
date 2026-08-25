@@ -12,6 +12,15 @@
 - [Testing](testing.md)
 - [v1 to v2 migration](migration-v1-to-v2.md)
 - [Implementation plan](plans/2026-08-22-thin-skill-evergreen-notebook.md)
+- [Official NotebookLM behavior research: auto-summary and artifacts](reports/2026-08-22-notebooklm-official-auto-summary-and-artifact-research.md)
+- [Official product behavior Advisor config](advisors/notebooklm-official-product-watch.json)
+- [UX Case 1: post-cutoff knowledge](reports/2026-08-22-ux-case-1-post-cutoff-knowledge.md)
+- [UX Case 2: Gauntlet Loop adoption](reports/2026-08-22-ux-case-2-gauntlet-loop-adoption.md)
+- [UX Case 3: Foucault author genealogy](reports/2026-08-22-ux-case-3-foucault-author-genealogy.md)
+- [Three-case UX recommendations — plain-language annotated version](reports/2026-08-22-three-case-ux-recommendations-plain-language.md)
+- [Three-case UX recommendations — technical version](reports/2026-08-22-three-case-ux-recommendations.md)
+- [Strict Grounding reproduction experiment report](reports/2026-08-23-strict-grounding-reproduction-experiment.md)
+- [Evaluation synthesis and architecture corrections report](reports/2026-08-23-evaluation-synthesis-and-architecture-corrections.md)
 - [Invalid Gauntlet Loop field trial record](reports/2026-08-22-gauntlet-loop-field-trial.md)
 
 These documents describe the supported `notebooklm_skill` package and

@@ -11,7 +11,7 @@ from pathlib import Path
 from notebooklm_skill.advisor import AdvisorService, AdvisorSetup
 from notebooklm_skill.apply_executor import ApplyExecutor, ApplyResult
 from notebooklm_skill.apply_plan import verify_apply_plan
-from notebooklm_skill.backend import NotebookBackend
+from notebooklm_skill.backend import AskResponse, CitationReference, NotebookBackend
 from notebooklm_skill.export import export_bundle
 from notebooklm_skill.models import (
     AdvisorProfile,
@@ -288,14 +288,23 @@ class EvergreenService:
             timeout=timeout,
         )
 
-    async def ask(self, advisor_id: str, question: str) -> str:
+    async def ask(
+        self,
+        advisor_id: str,
+        question: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AskResponse:
         if not self.backend.capabilities.chat_query:
             raise BackendCapabilityError("Backend does not support Advisor chat queries")
         question = question.strip()
         if not question:
             raise ValueError("Question cannot be empty")
         profile, _, _ = self.store.load(advisor_id)
-        return await self.backend.ask(profile.backend.notebook_id, question)
+        result = await self.backend.ask(profile.backend.notebook_id, question)
+        if isinstance(result, str):
+            return AskResponse(answer=result)
+        return result
 
     async def export_advisor(self, advisor_id: str, destination: Path) -> dict[str, object]:
         profile, _, sources = self.store.load(advisor_id)
@@ -558,6 +567,46 @@ class EvergreenService:
             candidate = f"{base[:64 - len(tail)]}{tail}"
             suffix += 1
         return candidate
+
+
+def format_answer_with_citations(
+    response: AskResponse,
+    sources: tuple[SourceRecord, ...] = (),
+) -> str:
+    """Format the Ask response with structured citation footnotes."""
+    output = response.answer.strip()
+    if not response.references:
+        return output
+
+    source_map = {s.backend_source_id: s for s in sources}
+    footnotes: list[str] = ["\n\n---\n\n### 📚 引用出處與原文對照表 (Citations & Highlights)"]
+
+    seen_refs: set[tuple[int | None, str, str | None]] = set()
+    for ref in response.references:
+        ref_key = (ref.citation_number, ref.source_id, ref.cited_text)
+        if ref_key in seen_refs:
+            continue
+        seen_refs.add(ref_key)
+
+        num_str = f"[{ref.citation_number}]" if ref.citation_number is not None else "[*]"
+        src = source_map.get(ref.source_id)
+        title = ref.source_title or (src.title if src else None) or ref.source_id
+        url_part = f" ({src.url})" if (src and src.url) else ""
+
+        char_info = ""
+        if ref.start_char is not None and ref.end_char is not None:
+            char_info = f" (字元 {ref.start_char}–{ref.end_char})"
+
+        quote_part = ""
+        if ref.cited_text and ref.cited_text.strip():
+            cleaned_quote = ref.cited_text.strip().replace("\n", " ")
+            if len(cleaned_quote) > 200:
+                cleaned_quote = cleaned_quote[:200] + "..."
+            quote_part = f'\n  > "{cleaned_quote}"'
+
+        footnotes.append(f"- **{num_str} {title}**{url_part}{char_info}{quote_part}")
+
+    return output + "\n" + "\n".join(footnotes)
 
 
 def load_setup_document(path: Path) -> tuple[
