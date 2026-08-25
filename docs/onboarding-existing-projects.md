@@ -1,8 +1,26 @@
-# NotebookLM Onboarding: Existing Projects
+# NotebookLM Onboarding: Existing Projects（Legacy v1 — 目前與 v2 Runtime Contract 不相容）
+
+> ⚠️ **狀態：Legacy v1，暫不可執行。** 本文件描述的雙 Notebook（Research／Project pair）
+> 架構、`scripts/run.py`（`auth_manager.py`、`create_notebook.py --pair`）呼叫方式，
+> 以及專案資料夾批次掃描匯入，皆違反 `SKILL.md` 的 v2 Runtime Contract（單一
+> Evergreen Advisor Notebook、僅能用 `python -m notebooklm_skill.cli ...`、不得使用
+> `scripts/`、不得掃描專案資料夾、不得強制 Research/Project pair）。詳見 SKILL.md
+> 「Runtime contract」與「Legacy v1」兩節。
+>
+> **更根本的問題：v2 的 CLI 目前沒有任何匯入本地檔案／文字的公開指令**（只有
+> `source-add-url`）。後端 `add_text_source()` 已存在且有測試覆蓋，但尚未包裝成
+> Advisor 方法或 CLI 指令。也就是說，本文件描述的「把既有專案文件匯入 NotebookLM」
+> 這個工作流程，在 v2 目前的公開能力下**做不到**，不只是指令名稱要換而已。
+>
+> 在 v2 的 `source-add-text`／`source-add-file` 指令補上之前，請不要照本文件執行；
+> 若只需要追蹤外部規格／文件的 URL，改用 `source-add-url` 搭配 v2 的 Preview →
+> Selection → Plan → Digest Approval → Apply 流程（見 SKILL.md）。本文件其餘章節
+> （文件盤點、過濾判斷、合併策略、反模式）的**方法論**仍然有效，只有「執行指令」
+> 部分是 v1 遺留、不能直接照抄。
 
 > **第一原理：** 聘請 NotebookLM 當你的專案文件管理員。每次查詢都應該返回有引用、有根據的答案 — 不是 AI 幻覺，而是你自己文件中的真實知識。
 
-本文件是一個完整的方法論：如何將一個已有大量文件的專案，中途導入 NotebookLM 雙 notebook 架構。
+本文件是一個完整的方法論：如何將一個已有大量文件的專案，中途導入 NotebookLM 雙 notebook 架構。**下方的雙 notebook 架構與 `scripts/run.py` 指令為 v1 遺留內容，見上方警語。**
 
 ---
 

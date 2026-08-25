@@ -5,28 +5,17 @@
 > **目標:** Research notebook (~6 sources) + Project notebook (~21 sources)
 > **產生日期:** 2026-03-27
 
-> **注意:** 這是針對 VerifyAI 這個專案產生的一次性執行紀錄，不是通用 onboarding
-> 文件——合併清單、來源路徑都是 VerifyAI 專屬的。通用流程請見
-> [`onboarding-existing-projects.md`](onboarding-existing-projects.md)。
-> 下方 Phase 1 的 `cd` 路徑是作者本機的絕對路徑，換一台機器或換一個專案執行都會
-> 失敗；不要直接照抄，改用下面「安裝路徑」小節的作法。
-
----
-
-## 安裝路徑（repo-scoped，不要硬寫絕對路徑）
-
-在你自己的專案根目錄建立一個指向 notebooklm-skill 實際安裝位置的 symlink，之後
-所有指令都透過這個 symlink 執行，不需要知道、也不需要依賴作者本機的路徑：
-
-```bash
-# 在你的專案根目錄執行，NOTEBOOKLM_SKILL_PATH 換成你機器上實際 clone 的位置
-ln -s "$NOTEBOOKLM_SKILL_PATH" .notebooklm-skill
-cd .notebooklm-skill
-.venv/bin/python scripts/run.py create_notebook.py --name "YourProject" --pair --tone default --show-browser
-```
-
-下方 Phase 1 的 `cd /Volumes/...` 僅為原始執行紀錄，保留作參考，不是可攜的安裝
-步驟。
+> ⚠️ **狀態：Legacy v1 執行紀錄，指令不可直接照抄。** 這是 2026-03-27 針對 VerifyAI
+> 這個專案產生的一次性執行紀錄，不是通用 onboarding 文件——合併清單、來源路徑都是
+> VerifyAI 專屬的。**全文使用的 `scripts/run.py`（`create_notebook.py --pair`、
+> `add_source.py`）是 v1 遺留指令，違反 SKILL.md 的 v2 Runtime Contract**（v2 只能
+> 用 `python -m notebooklm_skill.cli ...`，單一 Advisor Notebook，不得使用
+> `scripts/`）。且 v2 CLI 目前沒有對應 `add_source.py` 的本地檔案匯入指令（只有
+> `source-add-url`），所以本文件示範的批次匯入流程在 v2 下**目前無法重現**。
+>
+> 通用方法論請見 [`onboarding-existing-projects.md`](onboarding-existing-projects.md)
+> （同樣標示為 Legacy v1，理由相同）。下方 Phase 1 的 `cd /Volumes/...` 是作者本機
+> 絕對路徑，也不要照抄。
 
 ---
 
