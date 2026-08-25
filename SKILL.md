@@ -109,6 +109,21 @@ The command canonicalizes tracking parameters, waits for `ready`, and writes the
 Source Registry only after backend verification. Re-run the same command after a
 timeout so it can reconcile an already-created source; never add a blind duplicate.
 
+Add a local file's content as a text source (no URL required):
+
+```bash
+python -m notebooklm_skill.cli source-add-file \
+  --advisor-id market-watch \
+  --file ./ARCHITECTURE.md \
+  --state pinned
+```
+
+`--title` defaults to the file name. Reconciliation is keyed on title, not on a
+canonical URL — a source of this kind has no URL. Re-run the same command to
+reconcile rather than create a duplicate, same as `source-add-url`. This is the
+only supported local-file import path; there is no project-folder scan or bulk
+importer in v2 (see Legacy v1 below).
+
 Adoption registers existing sources as `active`; it never silently pins or
 retires them. Pin a core source explicitly:
 

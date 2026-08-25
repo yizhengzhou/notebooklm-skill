@@ -234,6 +234,66 @@ def test_add_url_source_requires_backend_capability(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_add_text_source_registers_and_reconciles_without_duplicates(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        first = await service.add_text_source(
+            advisor_id="advisor-001",
+            title="notes.md",
+            content="Local project notes.",
+            state="pinned",
+        )
+        again = await service.add_text_source(
+            advisor_id="advisor-001",
+            title="notes.md",
+            content="Local project notes.",
+            state="pinned",
+        )
+
+        assert first == again
+        assert first.state == "pinned"
+        assert first.url is None
+        assert first.canonical_url is None
+        assert len(store.load("advisor-001")[2]) == 1
+        assert len([event for event in backend.events if event.startswith("add_text:")]) == 1
+
+    asyncio.run(scenario())
+
+
+def test_add_text_source_requires_backend_capability(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+        backend.capabilities = BackendCapabilities(text_sources=False)
+
+        with pytest.raises(BackendCapabilityError, match="text sources"):
+            await service.add_text_source(
+                advisor_id="advisor-001",
+                title="notes.md",
+                content="Local project notes.",
+            )
+
+    asyncio.run(scenario())
+
+
 def test_ask_routes_question_through_registered_advisor(tmp_path: Path) -> None:
     async def scenario() -> None:
         backend = FakeNotebookBackend()

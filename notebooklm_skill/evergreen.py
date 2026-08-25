@@ -241,6 +241,75 @@ class EvergreenService:
             ) from exc
         return record
 
+    async def add_text_source(
+        self,
+        *,
+        advisor_id: str,
+        title: str,
+        content: str,
+        state: str = "active",
+    ) -> SourceRecord:
+        if not self.backend.capabilities.text_sources:
+            raise BackendCapabilityError("Backend does not support text sources")
+        if state not in {"active", "pinned"}:
+            raise ValueError("New text source state must be active or pinned")
+        if not title.strip():
+            raise ValueError("Text source title is required")
+        if not content.strip():
+            raise ValueError("Text source content must not be empty")
+        profile, _, registry = self.store.load(advisor_id)
+
+        registered = [
+            source
+            for source in registry
+            if source.state != "deleted" and source.url is None and source.title == title
+        ]
+        if len(registered) > 1:
+            raise RuntimeError(f"Registry contains duplicate text source title: {title}")
+        if registered:
+            record = registered[0]
+            current = await self.backend.list_sources(profile.backend.notebook_id)
+            current_by_id = {source.source_id: source for source in current}
+            if record.backend_source_id not in current_by_id:
+                raise RuntimeError(
+                    f"Registered text source is missing from backend: {record.backend_source_id}"
+                )
+            if state == "pinned" and record.state != "pinned":
+                return self.set_source_state(
+                    advisor_id=advisor_id,
+                    local_id=record.local_id,
+                    state="pinned",
+                )
+            return record
+
+        created = await self.backend.add_text_source(profile.backend.notebook_id, title, content)
+        ready = await self.backend.wait_source_ready(
+            profile.backend.notebook_id,
+            created.source_id,
+        )
+        if ready.status != "ready":
+            raise RuntimeError(f"Text source did not become ready: {ready.source_id}")
+        used = {source.local_id for source in registry}
+        record = SourceRecord(
+            local_id=self._new_local_id(ready.source_id, used),
+            backend_source_id=ready.source_id,
+            title=ready.title,
+            state=state,
+            origin="manual",
+            url=None,
+            canonical_url=None,
+            discovered_at=utc_now(),
+            last_verified_at=utc_now(),
+        )
+        try:
+            self.store.save_sources(advisor_id, (*registry, record))
+        except Exception as exc:
+            raise SourceRegistrationError(
+                ready.source_id,
+                f"Text source exists, but local registry persistence failed: {exc}",
+            ) from exc
+        return record
+
     def set_source_state(
         self,
         *,

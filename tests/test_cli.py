@@ -15,6 +15,7 @@ def test_cli_exposes_complete_manual_evergreen_workflow() -> None:
         "setup",
         "show",
         "source-add-url",
+        "source-add-file",
         "source-state",
         "ask",
         "preview",
@@ -41,6 +42,26 @@ def test_source_add_url_parser_accepts_pinned_seed() -> None:
     )
 
     assert args.command == "source-add-url"
+    assert args.state == "pinned"
+
+
+def test_source_add_file_parser_defaults_title_to_file_name(tmp_path: Path) -> None:
+    local_file = tmp_path / "ARCHITECTURE.md"
+    args = build_parser().parse_args(
+        [
+            "source-add-file",
+            "--advisor-id",
+            "verifyai",
+            "--file",
+            str(local_file),
+            "--state",
+            "pinned",
+        ]
+    )
+
+    assert args.command == "source-add-file"
+    assert args.file == local_file
+    assert args.title is None
     assert args.state == "pinned"
 
 

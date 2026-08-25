@@ -35,6 +35,16 @@ def build_parser() -> argparse.ArgumentParser:
     source_add_url.add_argument("--url", required=True)
     source_add_url.add_argument("--state", choices=("active", "pinned"), default="active")
 
+    source_add_file = commands.add_parser(
+        "source-add-file", help="Add or reconcile a local file as a text source"
+    )
+    source_add_file.add_argument("--advisor-id", required=True)
+    source_add_file.add_argument("--file", type=Path, required=True)
+    source_add_file.add_argument(
+        "--title", help="Defaults to the file name if not given"
+    )
+    source_add_file.add_argument("--state", choices=("active", "pinned"), default="active")
+
     source_state = commands.add_parser("source-state", help="Pin or classify a registered source")
     source_state.add_argument("--advisor-id", required=True)
     source_state.add_argument("--local-id", required=True)
@@ -156,6 +166,18 @@ async def run(args: argparse.Namespace) -> int:
         source = await service.add_url_source(
             advisor_id=args.advisor_id,
             url=args.url,
+            state=args.state,
+        )
+        _print(source.to_dict())
+    elif args.command == "source-add-file":
+        if not args.file.is_file():
+            raise SystemExit(f"File not found: {args.file}")
+        content = args.file.read_text(encoding="utf-8")
+        title = args.title or args.file.name
+        source = await service.add_text_source(
+            advisor_id=args.advisor_id,
+            title=title,
+            content=content,
             state=args.state,
         )
         _print(source.to_dict())

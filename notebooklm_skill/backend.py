@@ -16,6 +16,7 @@ class BackendCapabilities:
     native_refresh: bool = True
     source_delete: bool = True
     url_sources: bool = True
+    text_sources: bool = True
     chat_query: bool = True
 
 
