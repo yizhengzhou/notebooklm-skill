@@ -61,6 +61,7 @@
 1. 重新建立 Notebook，Pin 回同一批 6 份 MCP Authorization 規格來源（URL 清單見 `2026-08-23-strict-grounding-reproduction-experiment.md` 第二節）。
 2. 確認 Group 1（無 Persona）在技術上如何設定，記錄下實際送出的設定內容，不要用猜的。
 3. 確認三組的 Persona 文字互相之間除了「角色」與「規則」的差異外，沒有其他無意間的措辭差異（字數、語氣、格式要求都要盡量一致，只讓「有沒有角色」跟「有沒有規則」這兩個維度變化）。
+4. **每一次 `ask` 都必須帶 `--fresh`。** 2026-08-27 已確認並修好：`notebooklm-py` 在不指定 conversation ID 時一定會延續現有對話，之前 `EvergreenService.ask()` 收了 `conversation_id` 參數卻沒有真的傳給後端，形同沒有任何辦法保證獨立對話（見 `notebooklm_skill` commit `c0420dd`）。在這個修正之前執行本實驗，「重複 3 次」跟「盲測」都會失去意義，因為同一組內的三次重複其實是同一條被污染的對話延伸下去，不是三次獨立量測。修正已推上 `main`，執行前確認本機程式碼包含這個 commit。
 
 ## 七、評分維度、預期值與判定門檻
 
