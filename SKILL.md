@@ -144,10 +144,11 @@ python -m notebooklm_skill.cli ask \
 ```
 
 See "Ask and verify citations" below for structured reference objects and
-citation footnotes. `ask` still does not expose explicit fresh/follow-up
-conversation control; without a specified conversation ID it continues the
-current conversation, so do not treat consecutive `ask` calls as independent
-questions.
+citation footnotes. Without `--fresh` or `--conversation-id`, `ask` continues
+whatever conversation is currently active on the notebook — do not treat
+consecutive `ask` calls as independent questions unless you pass `--fresh`
+(deletes the existing conversation first, guaranteeing an unrelated turn) or
+address a specific `--conversation-id` explicitly.
 
 ## Manual Evergreen cycle
 
@@ -254,6 +255,13 @@ python -m notebooklm_skill.cli ask \
 ```
 
 Output includes `answer`, `conversation_id`, `turn_number`, and `formatted_answer` with grounded source quotes and character ranges.
+
+Add `--fresh` when the question must not be influenced by any prior turn on
+this notebook (e.g. repeated-trial experiments, self-audit questions): it
+deletes the notebook's current conversation before asking, so the next `ask`
+starts one with nothing to extend. Add `--conversation-id ID` instead to
+address a specific earlier conversation explicitly. `--fresh` and
+`--conversation-id` are mutually exclusive.
 
 ## Inspect and export
 

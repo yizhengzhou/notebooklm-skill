@@ -363,14 +363,25 @@ class EvergreenService:
         question: str,
         *,
         conversation_id: str | None = None,
+        fresh: bool = False,
     ) -> AskResponse:
         if not self.backend.capabilities.chat_query:
             raise BackendCapabilityError("Backend does not support Advisor chat queries")
         question = question.strip()
         if not question:
             raise ValueError("Question cannot be empty")
+        if fresh and conversation_id is not None:
+            raise ValueError("fresh and conversation_id are mutually exclusive")
         profile, _, _ = self.store.load(advisor_id)
-        result = await self.backend.ask(profile.backend.notebook_id, question)
+        if fresh:
+            existing = await self.backend.get_conversation_id(profile.backend.notebook_id)
+            if existing is not None:
+                await self.backend.delete_conversation(profile.backend.notebook_id, existing)
+        result = await self.backend.ask(
+            profile.backend.notebook_id,
+            question,
+            conversation_id=conversation_id,
+        )
         if isinstance(result, str):
             return AskResponse(answer=result)
         return result

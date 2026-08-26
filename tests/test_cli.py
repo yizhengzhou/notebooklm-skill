@@ -2,6 +2,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from notebooklm_skill.cli import build_parser, run
 from notebooklm_skill.evergreen import load_setup_document
 from notebooklm_skill.storage import AdvisorStore
@@ -80,6 +82,50 @@ def test_ask_parser_accepts_question_file(tmp_path: Path) -> None:
 
     assert args.command == "ask"
     assert args.question_file == question
+    assert args.fresh is False
+    assert args.conversation_id is None
+
+
+def test_ask_parser_accepts_fresh_flag() -> None:
+    args = build_parser().parse_args(
+        ["ask", "--advisor-id", "gauntlet-lab", "--question", "Q", "--fresh"]
+    )
+
+    assert args.fresh is True
+    assert args.conversation_id is None
+
+
+def test_ask_parser_accepts_conversation_id() -> None:
+    args = build_parser().parse_args(
+        [
+            "ask",
+            "--advisor-id",
+            "gauntlet-lab",
+            "--question",
+            "Q",
+            "--conversation-id",
+            "conv-123",
+        ]
+    )
+
+    assert args.fresh is False
+    assert args.conversation_id == "conv-123"
+
+
+def test_ask_parser_rejects_fresh_with_conversation_id() -> None:
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(
+            [
+                "ask",
+                "--advisor-id",
+                "gauntlet-lab",
+                "--question",
+                "Q",
+                "--fresh",
+                "--conversation-id",
+                "conv-123",
+            ]
+        )
 
 
 def test_setup_document_loads_cross_domain_profile(tmp_path: Path) -> None:

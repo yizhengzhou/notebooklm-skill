@@ -274,6 +274,14 @@ class GeminiNotebookBackend:
             references=tuple(refs),
         )
 
+    async def get_conversation_id(self, notebook_id: str) -> str | None:
+        async with self._client_factory() as client:
+            return await client.chat.get_conversation_id(notebook_id)
+
+    async def delete_conversation(self, notebook_id: str, conversation_id: str) -> None:
+        async with self._client_factory() as client:
+            await client.chat.delete_conversation(notebook_id, conversation_id)
+
     async def delete_source(self, notebook_id: str, source_id: str) -> None:
         async with self._client_factory() as client:
             await client.sources.delete(notebook_id, source_id)

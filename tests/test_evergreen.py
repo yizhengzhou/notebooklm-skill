@@ -315,6 +315,85 @@ def test_ask_routes_question_through_registered_advisor(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_ask_without_fresh_extends_the_same_conversation(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        first = await service.ask("advisor-001", "What should we test?")
+        second = await service.ask("advisor-001", "And then what?")
+
+        assert first.conversation_id == second.conversation_id
+        assert "delete_conversation" not in "".join(backend.events)
+
+    asyncio.run(scenario())
+
+
+def test_ask_fresh_deletes_prior_conversation_and_starts_a_new_one(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        first = await service.ask("advisor-001", "What should we test?")
+        second = await service.ask("advisor-001", "And then what?", fresh=True)
+
+        assert first.conversation_id != second.conversation_id
+        assert f"delete_conversation:{first.conversation_id}" in backend.events
+
+    asyncio.run(scenario())
+
+
+def test_ask_fresh_with_no_prior_conversation_does_not_call_delete(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        await service.ask("advisor-001", "First ever question", fresh=True)
+
+        assert not any(event.startswith("delete_conversation:") for event in backend.events)
+
+    asyncio.run(scenario())
+
+
+def test_ask_rejects_fresh_together_with_conversation_id(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            await service.ask("advisor-001", "Q", conversation_id="conv-1", fresh=True)
+
+    asyncio.run(scenario())
+
+
 def test_safe_apply_commits_addition_tombstone_and_run_history(tmp_path: Path) -> None:
     async def scenario() -> None:
         backend = FakeNotebookBackend()

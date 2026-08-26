@@ -55,6 +55,16 @@ def build_parser() -> argparse.ArgumentParser:
     question = ask.add_mutually_exclusive_group(required=True)
     question.add_argument("--question")
     question.add_argument("--question-file", type=Path)
+    conversation = ask.add_mutually_exclusive_group()
+    conversation.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Delete any existing conversation on this notebook first, guaranteeing an independent turn",
+    )
+    conversation.add_argument(
+        "--conversation-id",
+        help="Continue this specific prior conversation instead of the server's default 'most recent' one",
+    )
 
     preview = commands.add_parser("preview", help="Run resumable Deep Research preview")
     preview.add_argument("--advisor-id", required=True)
@@ -194,7 +204,12 @@ async def run(args: argparse.Namespace) -> int:
             if args.question_file is not None
             else args.question
         )
-        ask_res = await service.ask(args.advisor_id, question)
+        ask_res = await service.ask(
+            args.advisor_id,
+            question,
+            conversation_id=args.conversation_id,
+            fresh=args.fresh,
+        )
         profile, _, sources = store.load(args.advisor_id)
         formatted = format_answer_with_citations(ask_res, sources)
         _print(

@@ -53,6 +53,8 @@ class FakeNotebookBackend:
         self.refresh_commit_then_fail_ids: set[str] = set()
         self.fail_add_url = False
         self.add_url_commit_then_fail = False
+        self.conversations: dict[str, str | None] = {}
+        self._conversation_counter = 0
 
     async def create_notebook(self, title: str) -> NotebookRef:
         notebook_id = f"fake-{uuid4()}"
@@ -191,13 +193,27 @@ class FakeNotebookBackend:
             url=source.url,
         )
 
-    async def ask(self, notebook_id: str, question: str) -> AskResponse:
+    async def ask(
+        self,
+        notebook_id: str,
+        question: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AskResponse:
         self.events.append("ask")
         if self.fail_ask:
             raise RuntimeError("injected ask failure")
+        if conversation_id is not None:
+            active = conversation_id
+        else:
+            active = self.conversations.get(notebook_id)
+            if active is None:
+                self._conversation_counter += 1
+                active = f"fake-conv-{self._conversation_counter}"
+        self.conversations[notebook_id] = active
         return AskResponse(
             answer="Delta summary",
-            conversation_id="fake-conv-1",
+            conversation_id=active,
             turn_number=1,
             references=(
                 CitationReference(
@@ -209,6 +225,14 @@ class FakeNotebookBackend:
                 ),
             ),
         )
+
+    async def get_conversation_id(self, notebook_id: str) -> str | None:
+        return self.conversations.get(notebook_id)
+
+    async def delete_conversation(self, notebook_id: str, conversation_id: str) -> None:
+        self.events.append(f"delete_conversation:{conversation_id}")
+        if self.conversations.get(notebook_id) == conversation_id:
+            self.conversations[notebook_id] = None
 
     async def delete_source(self, notebook_id: str, source_id: str) -> None:
         self.events.append(f"delete:{source_id}")
