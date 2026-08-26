@@ -1,9 +1,9 @@
 # 目前開發狀態與交接說明
 
-> 更新日期：2026-08-23
+> 更新日期：2026-08-26
 >
-> 公開版本：`2.0.0`，另有尚未發版的 CLI 增量功能與 Citation Fidelity 升級
-> 核心測試：Python 3.11／3.12 各 67 tests (100% PASS)
+> 公開版本：`2.0.0`，另有已推上 `main` 但尚未發版的 CLI 增量功能
+> 核心測試：70 tests (100% PASS)，`ruff check` clean
 
 ## 1. 目前產品是什麼
 
@@ -18,6 +18,7 @@
 - backend-neutral state 與 readable source fulltext export
 - **結構化 Citation & Highlight 原文對照表渲染 (Ask Fidelity Interface)**
 - **內建 Strict Grounding 高可信度防幻覺與因果約束範本**
+- **本地檔案文字來源匯入（`source-add-file`，2026-08-26 新增）**
 
 目前 `persona` 欄位代表 **NotebookLM Custom Chat instructions**。
 
@@ -30,6 +31,7 @@
 | Custom Chat instructions + read-back | 已完成 | setup config 的 `persona` |
 | 顯示本機狀態 | 已完成 | `show` |
 | 加入 canonical URL | 已完成、尚未發版 | `source-add-url` |
+| 加入本地檔案（文字來源） | **已完成並通過真實 Notebook live smoke** | `source-add-file` |
 | Pin／分類來源 | 已完成 | `source-state` |
 | Deep Research Preview | 已完成並 live smoke | `preview` |
 | timeout resume／task reconciliation | 已完成並 live smoke | 相同 run ID／work directory 重跑 |
@@ -42,7 +44,7 @@
 | 直接 Ask（含 Citation 對照表） | **已升級完成並通過實測** | `ask` |
 | Portable export | 已完成 | `export` |
 | Readable source fulltext export | 已完成並 live smoke | `export` |
-| Offline Fake Backend | 已完成 | pytest (67 tests) |
+| Offline Fake Backend | 已完成 | pytest (70 tests) |
 | Python 3.11／3.12 CI | 已完成 | GitHub Actions |
 
 ## 3. 已知限制與後續規劃
@@ -51,6 +53,22 @@
 
 Google 官方說明指出，第一次加入來源時有時會自動建立起步 artifact；Pro／Ultra Chat 也具有建立檔案與修改 artifact 的 agentic actions。目前 Ask／Apply 已明確建立 Artifact Snapshot & Observe 規劃。研究與修正建議見 `docs/reports/2026-08-22-notebooklm-official-auto-summary-and-artifact-research.md`。
 
+### `source-add-file` 目前只支援單檔，沒有批次／自動分類
+
+`source-add-file` 一次只加一個檔案，靠使用者或呼叫端自己決定要加哪些檔案、下什麼
+title。**沒有**專案資料夾掃描、沒有依內容自動分類、沒有像 `docs/onboarding-existing-projects.md`
+描述的「654 個檔案 → 過濾 → 合併 → 批次匯入」流程——那份文件描述的批次能力
+在 v2 下不存在，只是現在多了一個檔案層級的手動入口。
+
+### Onboarding 文件已標示 Legacy v1，尚未有對應 v2 文件
+
+`docs/onboarding-existing-projects.md` 與 `docs/verifyai-import-plan.md` 描述的是
+雙 Notebook、`scripts/run.py`（`--pair`、`add_source.py`）架構，違反本文件 v2
+Runtime Contract（見 SKILL.md「Runtime contract」節）。兩份文件開頭都已加上
+Legacy v1 警語，**不要照裡面的指令執行**；但目前沒有對應的、真正描述 v2 單一
+Advisor 流程的「既有專案 onboarding」文件——如果要做，`source-add-file` 已經
+是可用的地基。
+
 ### 待推進功能
 
 - Source Hydration Quality Gate（Commit 前過濾 503 錯誤頁）
@@ -58,6 +76,7 @@ Google 官方說明指出，第一次加入來源時有時會自動建立起步 
 - 通知
 - Open Notebook backend
 - 候選來源互動式審查表（免手改 JSON）
+- v2 版「既有專案 onboarding」文件（批次匯入／自動過濾／分類，目前為空缺）
 
 ## 4. 各計畫狀態
 
@@ -106,7 +125,13 @@ Gauntlet Loop field trial 同時改變來源數量、研究內容、問題順序
 - Safe Apply 可先 import、等待 ready、產生 delta、備份，再刪除明確核准的非 Pinned source。
 - Drive refresh 使用 native freshness／refresh，source ID 不變。
 - Disposable live resources 已清理。
-- 正式 Advisor state 目前為 1：`notebooklm-official-product-watch`，用於追蹤 Google 官方產品行為；4 份 Help 核心來源為 Pinned，2 份官方 Blog 為 active。
+- 正式 Advisor state 目前為 2：`notebooklm-official-product-watch`（追蹤 Google 官方產品行為，4 份 Help 核心來源為 Pinned，2 份官方 Blog 為 active）；`localedit-global-local-sites`（外部試用專案 LocalEdit，2026-08-25 用 `source-add-file` 加入第一份 pinned 本地文字來源，實測成功）。
+- `source-add-file` 已在真實帳號、真實 Notebook 上驗證成功（非 FakeBackend），含 `--state pinned`。
+- **診斷技巧**：要查一個 Notebook 目前的 Deep Research 任務狀態，不需要知道我們自己 CLI 用的 `--run-id`／`--work-directory`，可以直接用底層套件的
+  `notebooklm research status -n <notebook_id> --json`（`.venv/bin/notebooklm`），會回傳該 Notebook 目前任務的
+  `task_id`／`status`／`sources`／`report`，不受本機 checkpoint 遺失影響。2026-08-26 用這個方法確認 `localedit-global-local-sites`
+  的研究任務狀態是 `completed`（55 個候選來源、完整報告），並非卡住。
+- **一個已修正的錯誤推論，記錄下來避免重犯**：不能拿「來源加入時間」與「事後查詢時間」的差距，去推論 Deep Research 實際跑了多久——中間可能包含人工暫停（例如等待使用者允許 agent 繼續執行的權限提示），這段時間不是後端處理時間。目前沒有可靠數據顯示 Deep Research 實際耗時超過 Case 1-3 建立的 331-356 秒基準；上述完成的任務唯一能確認的是「有完成、沒有卡死」，耗時本身未知。
 
 這些是工程能力驗證，不等於終端產品價值驗證。
 
@@ -118,3 +143,6 @@ Gauntlet Loop field trial 同時改變來源數量、研究內容、問題順序
 4. 若要做 Persona 實驗，必須先 pre-register，固定來源／問題／conversation，只改一個設定變數。
 5. 若要修改 `ask`，優先保留原生 references 與 conversation metadata。
 6. 所有 live resource／quota 操作仍需明確 Gate。
+7. `docs/onboarding-existing-projects.md` 與 `docs/verifyai-import-plan.md` 是 Legacy v1，不要照著執行；需要匯入本地檔案時用 `source-add-file`（見第 3 節限制）。
+8. 要查某個 Notebook 的 Deep Research 任務是否卡住，先用 `notebooklm research status -n <notebook_id> --json` 直接問後端，不要憑本機時間戳猜測耗時（見第 6 節）。
+9. 修改後，若涉及對外溝通或使用者已在測試的功能，**當天結束前更新本文件**，不要只留在對話紀錄或散落的 `docs/reports/*.md` 裡——下一位 agent 預設只讀本文件。
