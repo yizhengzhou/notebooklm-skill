@@ -84,11 +84,67 @@ Prepare an input JSON file:
 
 ### Writing `persona.instructions`
 
-Default to two parts: a role sentence (what this Advisor is for, in the
-user's own domain) plus explicit grounding rules — answer only from the
-provided sources, cite every factual claim, say "not covered" rather than
-guessing, don't deny text that is actually present in a source, never claim
-to have run code or changed files. Example:
+The role sentence has two independent choices, not one — pick both, don't
+default to the first idea that comes to mind:
+
+**What domain is this Advisor for?** A few starting points to adapt, not an
+exhaustive list:
+- *Spec/API tracking*: "...helping an engineering team understand how
+  [spec/API] has changed since [baseline version] and what that means for
+  an existing integration."
+- *Technology evaluation*: "...helping a small team decide whether [a new
+  technique/tool] is mature enough to adopt, and under what constraints."
+- *Market/competitor research*: "...tracking competitor moves, pricing, and
+  industry trends relevant to [product]."
+- *Literature/idea genealogy*: "...tracing how [a concept/text] has been
+  received, revised, or contested by later work."
+- *Project documentation*: "...pointing to the specific decision, spec, or
+  past incident behind a question about this project, citing project
+  documents directly."
+- *Tool/API documentation*: "...always referencing the uploaded official
+  documentation and explaining both the recommended usage and the
+  underlying reasoning."
+
+**What stance does it take toward the user?** This is a separate choice from
+the domain above, and changes the phrasing, not just the topic:
+- *Directive/expert* (the default assumed below if unstated): answers
+  authoritatively, like a consultant handing over a recommendation.
+- *Coach*: asks clarifying questions first, pushes the user toward their own
+  conclusion rather than just stating one — e.g. append "Before answering,
+  ask me what I've already tried or considered. Help me reach the answer
+  rather than just giving it to me."
+- *Partner*: thinks alongside the user as a peer rather than from authority
+  — e.g. append "Treat this as a working discussion, not a verdict — flag
+  where you're uncertain or where reasonable people could disagree."
+
+Nothing about which stance suits which user has been tested — this is an
+unvalidated design axis, offered as a choice to make deliberately, not a
+claim that any one of these performs better.
+
+Three more independent choices worth making deliberately, not defaulting on:
+
+- **Output shape**: prose, a checklist, or a table — state it if it matters;
+  don't assume the default shape fits how the answer will actually be used.
+- **Hedge vs. commit under uncertainty**: the grounding rules below default
+  to "say not covered rather than guessing," which is right for factual
+  claims, but some uses need a labeled best-effort recommendation even when
+  sources are incomplete instead of a Notebook that just declines. If that's
+  the goal, say so explicitly — e.g. "When sources are incomplete, you may
+  still offer a recommendation, but label it clearly as inference, not
+  sourced fact." Decide this on purpose; don't let strict grounding silently
+  turn into an Advisor that never commits to anything.
+- **Decision-history awareness**: for an Advisor meant to be revisited over
+  time (this Skill's Evergreen premise), consider adding "if this answer
+  conflicts with a judgment you gave in an earlier session on this Notebook,
+  say so explicitly rather than presenting it as new" — otherwise nothing in
+  the persona itself reflects that this is meant to be a long-lived Advisor
+  rather than a one-off query.
+
+Whatever domain and stance you pick, add explicit grounding rules — answer
+only from the provided sources, cite every factual claim, say "not covered"
+rather than guessing, don't deny text that is actually present in a source,
+never claim to have run code or changed files. Example (directive/expert
+stance, spec-tracking domain):
 
 ```text
 Act as a senior technical advisor for an AI coding agent platform team.
