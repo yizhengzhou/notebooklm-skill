@@ -121,24 +121,37 @@ Nothing about which stance suits which user has been tested — this is an
 unvalidated design axis, offered as a choice to make deliberately, not a
 claim that any one of these performs better.
 
-Three more independent choices worth making deliberately, not defaulting on:
+**Put in Persona only what must hold for every future question on this
+Notebook.** Persona is standing state, not a place to restate something a
+single `ask` call could say instead — repeating a rule in both places is how
+the Persona/prompt overlap problem in the reports above happened. A rough
+test: if you'd be fine with a different answer to this one when the next
+question is phrased differently, it belongs in that question, not here.
 
-- **Output shape**: prose, a checklist, or a table — state it if it matters;
-  don't assume the default shape fits how the answer will actually be used.
+By that test, **stance and output shape usually belong in the question, not
+the Persona** — e.g. "before answering, ask what I've already tried" or
+"answer as a table" as part of a specific `ask`, not a permanent Notebook
+setting. Only promote either into Persona if you genuinely want it applied
+to every future question on this Notebook regardless of how each is phrased
+(e.g. a Notebook whose entire purpose is Socratic tutoring).
+
+Two things that do hold for every future question, and so belong in Persona
+rather than being repeated per-question:
+
 - **Hedge vs. commit under uncertainty**: the grounding rules below default
-  to "say not covered rather than guessing," which is right for factual
-  claims, but some uses need a labeled best-effort recommendation even when
-  sources are incomplete instead of a Notebook that just declines. If that's
-  the goal, say so explicitly — e.g. "When sources are incomplete, you may
-  still offer a recommendation, but label it clearly as inference, not
-  sourced fact." Decide this on purpose; don't let strict grounding silently
-  turn into an Advisor that never commits to anything.
+  to "say not covered rather than guessing," right for factual claims, but
+  some Advisors need a labeled best-effort recommendation even when sources
+  are incomplete, rather than one that just declines. If that's the goal for
+  this Notebook as a whole, say so once, here — e.g. "When sources are
+  incomplete, you may still offer a recommendation, but label it clearly as
+  inference, not sourced fact." Decide this on purpose; don't let strict
+  grounding silently turn into an Advisor that never commits to anything.
 - **Decision-history awareness**: for an Advisor meant to be revisited over
   time (this Skill's Evergreen premise), consider adding "if this answer
   conflicts with a judgment you gave in an earlier session on this Notebook,
-  say so explicitly rather than presenting it as new" — otherwise nothing in
-  the persona itself reflects that this is meant to be a long-lived Advisor
-  rather than a one-off query.
+  say so explicitly rather than presenting it as new" — this is inherently
+  about the Notebook's whole lifetime, not any single question, so a
+  per-question instruction can't substitute for it.
 
 Whatever domain and stance you pick, add explicit grounding rules — answer
 only from the provided sources, cite every factual claim, say "not covered"
