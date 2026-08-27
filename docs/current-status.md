@@ -149,3 +149,6 @@ Gauntlet Loop field trial 同時改變來源數量、研究內容、問題順序
 8. 要查某個 Notebook 的 Deep Research 任務是否卡住，先用 `notebooklm research status -n <notebook_id> --json` 直接問後端，不要憑本機時間戳猜測耗時（見第 6 節）。
 9. 修改後，若涉及對外溝通或使用者已在測試的功能，**當天結束前更新本文件**，不要只留在對話紀錄或散落的 `docs/reports/*.md` 裡——下一位 agent 預設只讀本文件。
 10. 任何需要「這一題的答案不能被前一題影響」的測試（重複試驗、self-audit、對照組實驗），一定要用 `ask --fresh`，不要假設不指定 conversation ID 就是新對話——預設行為是延續現有對話。
+11. **在設計任何新的 live 實驗之前，先讀 `docs/reports/2026-08-27-methodology-lessons.md`。** 2026-08-27 做 Persona 效果實驗時，一路犯過並修正過的方法論錯誤（pilot 沒做就放大規模、評分工具本身未驗證、把「有出現差異」直接當「有因果效果」、對隨機系統講「每次都」、想用樣本數解決外部效度問題）都記在那份文件，不要重蹈覆轍。
+12. **Persona 的建議寫法與設計原則已經寫進 SKILL.md**（domain／互動姿態／輸出格式／不確定時要不要給建議／decision-history-awareness 五個維度，以及「只有對整個 Notebook 每一題都成立的東西才放 Persona，其餘放進單一問題」的判斷原則）。修改 Persona 相關文件前先讀那一段，不要重新發明。
+13. **2026-08-27 的 Persona 效果實驗結論是「有限觀察，非定論」**（見 `2026-08-27-persona-effect-experiment-final-report.md`）：這次 27 次呼叫裡沒有捏造案例；Persona 強度對引用支撐率／因果跳躍率沒有測到符合預先門檻的效果；Strict Grounding 唯一一致的差異是讓誠實揭露更結構化。這是這一次、這批來源的觀察，不能推廣，不要在其他文件裡把它包裝成「已驗證」的通則。
