@@ -82,6 +82,38 @@ Prepare an input JSON file:
 }
 ```
 
+### Writing `persona.instructions`
+
+Default to two parts: a role sentence (what this Advisor is for, in the
+user's own domain) plus explicit grounding rules — answer only from the
+provided sources, cite every factual claim, say "not covered" rather than
+guessing, don't deny text that is actually present in a source, never claim
+to have run code or changed files. Example:
+
+```text
+Act as a senior technical advisor for an AI coding agent platform team.
+
+1. Answer strictly from the sources in this Notebook only; no outside
+   inference or speculation.
+2. Cite a source for every factual claim.
+3. If a source doesn't cover something, say so explicitly — never guess.
+4. Never deny text that is actually present in a source.
+5. Never claim to have run code, created files, or deployed anything.
+```
+
+This is a starting default, not a validated optimum — recommended because
+citing every claim and naming gaps explicitly makes an answer something the
+user can actually go check, which is the point of a source-grounded
+Advisor, independent of whether it changes any error rate. A controlled
+comparison (`docs/reports/2026-08-27-persona-effect-experiment-final-report.md`)
+found no measurable difference in fabrication rate between having this text,
+a bare role sentence, or no persona at all; the one repeatable difference it
+found was that this fuller version produces more structured, checkable
+citations. That result is bounded to the handful of cases actually run and
+does not generalize — treat it as one data point, not proof this template is
+"better," and don't extend its numbers to other questions, sources, or model
+versions.
+
 Create a new Notebook and apply/read back the Persona:
 
 ```bash
