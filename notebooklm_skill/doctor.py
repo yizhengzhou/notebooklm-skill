@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from typing import Any
 
 from notebooklm_skill.backend import NotebookBackend
@@ -26,17 +27,51 @@ EXPECTED_MCP_TOOLS = {
 }
 
 
+def _probe_configured_mcp_launch(target: InstallTarget) -> dict[str, Any]:
+    command = target.mcp_entry.get("command")
+    args = target.mcp_entry.get("args", [])
+    cwd = target.mcp_entry.get("cwd", str(target.project_root))
+    if not isinstance(command, str) or not isinstance(args, list) or not all(
+        isinstance(item, str) for item in args
+    ):
+        return {"ok": False, "error": "Invalid managed MCP command or args"}
+    if not isinstance(cwd, str):
+        return {"ok": False, "error": "Invalid managed MCP cwd"}
+    try:
+        result = subprocess.run(
+            [command, *args],
+            cwd=cwd,
+            input=b"",
+            capture_output=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    stderr = result.stderr.decode(errors="replace")
+    return {
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "stderr_tail": stderr[-2000:],
+    }
+
+
 async def diagnose_project_brain(
     target: InstallTarget,
     backend: NotebookBackend,
     store: AdvisorStore,
 ) -> dict[str, Any]:
     plan = build_install_plan(target)
-    integration_installed = (
+    integration_files_ok = (
         plan.can_install
         and plan.mcp_action == "unchanged"
         and plan.skill_action == "unchanged"
     )
+    launch_probe = _probe_configured_mcp_launch(target) if integration_files_ok else {
+        "ok": False,
+        "error": "Managed MCP/Skill files are not installed exactly",
+    }
+    integration_installed = integration_files_ok and bool(launch_probe["ok"])
 
     server = create_project_brain_server(backend=backend, state_root=store.root)
     tools = {tool.name for tool in await server.list_tools()}
@@ -92,6 +127,8 @@ async def diagnose_project_brain(
         ),
         "client": target.client,
         "installation_ok": integration_installed,
+        "integration_files_ok": integration_files_ok,
+        "configured_mcp_launch": launch_probe,
         "install_plan": plan.to_dict(),
         "mcp_tools_ok": tools_ok,
         "mcp_tools": sorted(tools),

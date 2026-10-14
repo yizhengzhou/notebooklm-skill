@@ -116,7 +116,10 @@ def resolve_install_target(
         mcp_path = root / ".mcp.json"
         skill_path = root / ".agents" / "skills" / SKILL_NAME / "SKILL.md"
 
-    executable = (python_executable or Path(sys.executable)).resolve()
+    # Preserve the virtual-environment launcher path. Resolving this symlink would
+    # point at uv/venv's base interpreter, which does not have the environment's
+    # installed packages on sys.path when an MCP client launches it directly.
+    executable = (python_executable or Path(sys.executable)).expanduser().absolute()
     entry: dict[str, object] = {
         "command": str(executable),
         "args": ["-m", "notebooklm_skill.mcp_server"],

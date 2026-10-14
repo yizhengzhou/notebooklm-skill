@@ -109,12 +109,15 @@ adopt one only after the user approves that choice.
 - exact MCP configuration;
 - exact installed Skill;
 - expected server-side MCP tool manifest;
+- the exact configured MCP command starts successfully from its configured cwd;
 - project-local binding;
 - Notebook access and live source capacity;
 - grounding readiness.
 
-It does not pretend that a currently running Agent client has hot-loaded the new
-configuration. When `client_reload_required=true`, reload or restart the client,
+Doctor launches the exact configured command with closed stdin, so a broken
+Python path or missing package fails `installation_ok`. It still does not pretend
+that a currently running Agent client has hot-loaded the new configuration.
+When `client_reload_required=true`, reload or restart the client,
 then call MCP `brain_capabilities` and `brain_health`. Pi project MCP config also
 requires the project to be trusted; an untrusted project correctly ignores
 `.pi/mcp.json`.

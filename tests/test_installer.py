@@ -36,6 +36,26 @@ def test_auto_detection_refuses_ambiguous_client_directories(tmp_path: Path) -> 
         detect_client(tmp_path, environment={})
 
 
+def test_install_preserves_virtualenv_python_symlink_path(tmp_path: Path) -> None:
+    base_python = tmp_path / "uv-python/bin/python3.11"
+    base_python.parent.mkdir(parents=True)
+    base_python.write_text("base", encoding="utf-8")
+    venv_python = tmp_path / "source/.venv/bin/python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(base_python)
+    project = tmp_path / "target"
+    project.mkdir()
+
+    target = resolve_install_target(
+        project,
+        "pi",
+        python_executable=venv_python,
+    )
+
+    assert target.mcp_entry["command"] == str(venv_python.absolute())
+    assert target.mcp_entry["command"] != str(base_python.resolve())
+
+
 def test_install_is_preview_first_no_clobber_and_idempotent(tmp_path: Path) -> None:
     target = resolve_install_target(
         tmp_path,

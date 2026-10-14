@@ -162,7 +162,7 @@ rm /absolute/path/to/my-project/.notebooklm/brain.json
 ## 目前限制
 
 - `brain-init` 目前只能綁定已存在的 Advisor；之後會整合成單一 create/adopt onboarding。
-- 尚未安裝 project-local MCP／Skill。
+- Project-local MCP／Skill 可由 Agent installer 安裝；新設定需要 client reload／restart，Pi 還要求 project trust。
 - 核心文件候選目前只靠保守檔名 heuristic；正式主詞仍是負責專案且實際讀過內容的 Agent。
 - 尚未自動上傳、替換或同步核心專案文件。
 - 已提供 Agent-direct project-local installer，目前支援 Pi、Claude Code 與 generic Agent Skills + MCP layout；其他 client 需明確選擇相容 layout 或後續擴充。
