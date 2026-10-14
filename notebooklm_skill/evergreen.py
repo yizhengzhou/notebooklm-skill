@@ -12,7 +12,14 @@ from notebooklm_skill.advisor import AdvisorService, AdvisorSetup
 from notebooklm_skill.apply_executor import ApplyExecutor, ApplyResult
 from notebooklm_skill.apply_plan import verify_apply_plan
 from notebooklm_skill.backend import AskResponse, NotebookBackend
+from notebooklm_skill.capacity import (
+    SourceAddNotCommittedError,
+    SourceCapacity,
+    inspect_source_capacity,
+    require_source_capacity,
+)
 from notebooklm_skill.export import export_bundle
+from notebooklm_skill.grounding import normalized_text_sha256
 from notebooklm_skill.models import (
     AdvisorProfile,
     BackendRef,
@@ -20,6 +27,7 @@ from notebooklm_skill.models import (
     RefreshRun,
     ResearchProfile,
     SourceRecord,
+    SourceRole,
     WatchItem,
 )
 from notebooklm_skill.preview import PreviewEngine, PreviewPlan, canonicalize_url
@@ -213,11 +221,17 @@ class EvergreenService:
                 matching_backend[0].source_id,
             )
         else:
+            await require_source_capacity(
+                self.backend,
+                profile.backend.notebook_id,
+                planned_additions=1,
+            )
             created = await self.backend.add_url_source(profile.backend.notebook_id, canonical)
             ready = await self.backend.wait_source_ready(
                 profile.backend.notebook_id,
                 created.source_id,
             )
+        await self._verify_source_committed(profile.backend.notebook_id, ready.source_id)
         if ready.status != "ready":
             raise RuntimeError(f"URL source did not become ready: {ready.source_id}")
         used = {source.local_id for source in registry}
@@ -248,6 +262,9 @@ class EvergreenService:
         title: str,
         content: str,
         state: str = "active",
+        roles: tuple[SourceRole, ...] = (),
+        project_path: str | None = None,
+        git_commit: str | None = None,
     ) -> SourceRecord:
         if not self.backend.capabilities.text_sources:
             raise BackendCapabilityError("Backend does not support text sources")
@@ -258,6 +275,7 @@ class EvergreenService:
         if not content.strip():
             raise ValueError("Text source content must not be empty")
         profile, _, registry = self.store.load(advisor_id)
+        content_sha256 = normalized_text_sha256(content)
 
         registered = [
             source
@@ -274,19 +292,103 @@ class EvergreenService:
                 raise RuntimeError(
                     f"Registered text source is missing from backend: {record.backend_source_id}"
                 )
-            if state == "pinned" and record.state != "pinned":
-                return self.set_source_state(
-                    advisor_id=advisor_id,
-                    local_id=record.local_id,
-                    state="pinned",
+            if roles or project_path is not None:
+                backend_content = await self.backend.get_source_content(
+                    profile.backend.notebook_id,
+                    record.backend_source_id,
                 )
+                if normalized_text_sha256(backend_content.content) != content_sha256:
+                    raise RuntimeError(
+                        "SOURCE_CONTENT_MISMATCH: existing backend source content differs "
+                        "from the proposed canonical project file"
+                    )
+            updated = replace(
+                record,
+                state="pinned" if state == "pinned" else record.state,
+                roles=tuple(sorted(set((*record.roles, *roles)))),
+                project_path=project_path or record.project_path,
+                content_sha256=(
+                    content_sha256
+                    if project_path is not None or roles
+                    else record.content_sha256
+                ),
+                git_commit=git_commit or record.git_commit,
+                last_verified_at=(
+                    utc_now()
+                    if roles
+                    or project_path is not None
+                    or (state == "pinned" and record.state != "pinned")
+                    else record.last_verified_at
+                ),
+            )
+            if updated != record:
+                self.store.save_sources(
+                    advisor_id,
+                    tuple(
+                        updated if source.local_id == record.local_id else source
+                        for source in registry
+                    ),
+                )
+            return updated
+
+        current = await self.backend.list_sources(profile.backend.notebook_id)
+        same_title = tuple(
+            source for source in current if source.url is None and source.title == title
+        )
+        if same_title:
+            content_matches = []
+            for candidate in same_title:
+                ready_candidate = (
+                    candidate
+                    if candidate.status == "ready"
+                    else await self.backend.wait_source_ready(
+                        profile.backend.notebook_id,
+                        candidate.source_id,
+                    )
+                )
+                backend_content = await self.backend.get_source_content(
+                    profile.backend.notebook_id,
+                    ready_candidate.source_id,
+                )
+                if normalized_text_sha256(backend_content.content) == content_sha256:
+                    content_matches.append(ready_candidate)
+            if len(content_matches) != 1:
+                reason = "no exact content match" if not content_matches else "multiple exact matches"
+                raise RuntimeError(
+                    "SOURCE_CONTENT_MISMATCH: backend already contains same-title text "
+                    f"sources but reconciliation found {reason}"
+                )
+            adopted = content_matches[0]
+            used = {source.local_id for source in registry}
+            record = SourceRecord(
+                local_id=self._new_local_id(adopted.source_id, used),
+                backend_source_id=adopted.source_id,
+                title=adopted.title,
+                state=state,
+                origin="manual",
+                url=None,
+                canonical_url=None,
+                discovered_at=utc_now(),
+                last_verified_at=utc_now(),
+                roles=roles,
+                project_path=project_path,
+                content_sha256=content_sha256,
+                git_commit=git_commit,
+            )
+            self.store.save_sources(advisor_id, (*registry, record))
             return record
 
+        await require_source_capacity(
+            self.backend,
+            profile.backend.notebook_id,
+            planned_additions=1,
+        )
         created = await self.backend.add_text_source(profile.backend.notebook_id, title, content)
         ready = await self.backend.wait_source_ready(
             profile.backend.notebook_id,
             created.source_id,
         )
+        await self._verify_source_committed(profile.backend.notebook_id, ready.source_id)
         if ready.status != "ready":
             raise RuntimeError(f"Text source did not become ready: {ready.source_id}")
         used = {source.local_id for source in registry}
@@ -300,6 +402,10 @@ class EvergreenService:
             canonical_url=None,
             discovered_at=utc_now(),
             last_verified_at=utc_now(),
+            roles=roles,
+            project_path=project_path,
+            content_sha256=content_sha256,
+            git_commit=git_commit,
         )
         try:
             self.store.save_sources(advisor_id, (*registry, record))
@@ -330,6 +436,43 @@ class EvergreenService:
         self.store.save_sources(advisor_id, updated)
         return updated_record
 
+    async def update_advisor(
+        self,
+        *,
+        advisor_id: str,
+        title: str | None = None,
+        persona: PersonaProfile | None = None,
+        research: ResearchProfile | None = None,
+        watchlist: tuple[WatchItem, ...] | None = None,
+    ) -> AdvisorProfile:
+        profile, old_watchlist, _ = self.store.load(advisor_id)
+        new_title = title if title is not None else profile.title
+        new_persona = persona if persona is not None else profile.persona
+        new_research = research if research is not None else profile.research
+        new_watchlist = watchlist if watchlist is not None else old_watchlist
+
+        if persona is not None:
+            if not self.backend.capabilities.persona_readback:
+                raise BackendCapabilityError("Backend cannot verify Persona configuration")
+            await self.backend.configure_chat(
+                profile.backend.notebook_id,
+                new_persona.instructions,
+                new_persona.response_length,
+            )
+
+        updated_profile = AdvisorProfile(
+            advisor_id=advisor_id,
+            title=new_title,
+            backend=profile.backend,
+            persona=new_persona,
+            research=new_research,
+            schedule=profile.schedule,
+        )
+        self.store.save_profile(updated_profile)
+        if watchlist is not None:
+            self.store.save_watchlist(advisor_id, new_watchlist)
+        return updated_profile
+
     async def preview(
         self,
         *,
@@ -337,20 +480,24 @@ class EvergreenService:
         run_id: str,
         work_directory: Path,
         timeout: float = 1800,
+        query: str | None = None,
     ) -> PreviewPlan:
         if not self.backend.capabilities.deep_research:
             raise BackendCapabilityError("Backend does not support Deep Research previews")
         profile, watchlist, _ = self.store.load(advisor_id)
-        query = compose_research_query(
-            profile.research,
-            watchlist,
-            self.store.load_refresh_runs(advisor_id),
-        )
+        if query is not None and query.strip():
+            composed_query = query.strip()
+        else:
+            composed_query = compose_research_query(
+                profile.research,
+                watchlist,
+                self.store.load_refresh_runs(advisor_id),
+            )
         return await PreviewEngine(self.backend).run(
             run_id=run_id,
             advisor_id=advisor_id,
             notebook_id=profile.backend.notebook_id,
-            query=query,
+            query=composed_query,
             work_directory=work_directory,
             max_new_sources=profile.research.max_new_sources_per_run,
             preferred_domains=profile.research.preferred_domains,
@@ -385,6 +532,19 @@ class EvergreenService:
         if isinstance(result, str):
             return AskResponse(answer=result)
         return result
+
+    async def source_capacity(
+        self,
+        advisor_id: str,
+        *,
+        planned_additions: int = 0,
+    ) -> SourceCapacity:
+        profile, _, _ = self.store.load(advisor_id)
+        return await inspect_source_capacity(
+            self.backend,
+            profile.backend.notebook_id,
+            planned_additions=planned_additions,
+        )
 
     async def export_advisor(self, advisor_id: str, destination: Path) -> dict[str, object]:
         profile, _, sources = self.store.load(advisor_id)
@@ -636,6 +796,18 @@ class EvergreenService:
             raise RuntimeError("Imported backend sources could not be reconciled into the registry")
         return tuple(updated), tuple(sorted(imported_local)), tuple(sorted(deleted_local))
 
+    async def _verify_source_committed(self, notebook_id: str, source_id: str) -> None:
+        current = await self.backend.list_sources(notebook_id)
+        matches = [source for source in current if source.source_id == source_id]
+        if len(matches) != 1:
+            raise SourceAddNotCommittedError(
+                f"Source add was not committed exactly once: {source_id}; found {len(matches)}"
+            )
+        if matches[0].status != "ready":
+            raise SourceAddNotCommittedError(
+                f"Source exists but is not ready after add: {source_id} ({matches[0].status})"
+            )
+
     @staticmethod
     def _new_local_id(backend_source_id: str, used: set[str]) -> str:
         stem = re.sub(r"[^a-z0-9]+", "-", backend_source_id.lower()).strip("-")
@@ -698,8 +870,13 @@ def load_setup_document(path: Path) -> tuple[
 ]:
     data = json.loads(path.read_text(encoding="utf-8"))
     persona_data = data["persona"]
-    research_data = dict(data["research"])
-    research_data.setdefault("schema_version", 1)
+    raw_research = data.get("research")
+    if raw_research is None:
+        research = ResearchProfile(enabled=False)
+    else:
+        research_data = dict(raw_research)
+        research_data.setdefault("schema_version", 1)
+        research = ResearchProfile.from_dict(research_data)
     return (
         str(data["advisor_id"]),
         str(data["title"]),
@@ -707,6 +884,47 @@ def load_setup_document(path: Path) -> tuple[
             instructions=str(persona_data["instructions"]),
             response_length=persona_data.get("response_length", "default"),
         ),
-        ResearchProfile.from_dict(research_data),
+        research,
         tuple(WatchItem.from_dict(item) for item in data.get("watchlist", [])),
+    )
+
+
+def load_update_document(path: Path) -> tuple[
+    str,
+    str | None,
+    PersonaProfile | None,
+    ResearchProfile | None,
+    tuple[WatchItem, ...] | None,
+]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if "advisor_id" not in data:
+        raise ValueError("Missing 'advisor_id' in update document")
+    advisor_id = str(data["advisor_id"])
+
+    title = str(data["title"]) if "title" in data else None
+
+    persona = None
+    if "persona" in data:
+        persona_data = data["persona"]
+        persona = PersonaProfile(
+            instructions=str(persona_data["instructions"]),
+            response_length=persona_data.get("response_length", "default"),
+        )
+
+    research = None
+    if "research" in data:
+        research_data = dict(data["research"])
+        research_data.setdefault("schema_version", 1)
+        research = ResearchProfile.from_dict(research_data)
+
+    watchlist = None
+    if "watchlist" in data:
+        watchlist = tuple(WatchItem.from_dict(item) for item in data["watchlist"])
+
+    return (
+        advisor_id,
+        title,
+        persona,
+        research,
+        watchlist,
     )

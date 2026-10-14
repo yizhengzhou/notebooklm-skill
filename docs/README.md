@@ -3,6 +3,10 @@
 ## v2 Evergreen Advisor
 
 - [Current status and handoff](current-status.md)
+- [Project Brain MCP + Skill development roadmap](plans/2026-10-13-project-brain-mcp-skill-development-roadmap.md)
+- [Agent-direct Project Brain installation](agent-install.md)
+- [Project Brain phase-one pilot guide](project-brain-pilot.md)
+- [Project Brain MCP setup and tools](project-brain-mcp.md)
 - [User guide](user-guide.md)
 - [Local runtime and authentication](local-runtime.md)
 - [Advisor storage and export](advisor-storage.md)

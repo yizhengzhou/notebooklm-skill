@@ -28,6 +28,9 @@ Studio artifact instructions remain separate from the Chat Persona.
 ## Status and guides
 
 - [Current implementation status and handoff](docs/current-status.md)
+- [Agent-direct installation](docs/agent-install.md)
+- [Project Brain pilot guide](docs/project-brain-pilot.md)
+- [Project Brain MCP setup](docs/project-brain-mcp.md)
 - [Complete user guide](docs/user-guide.md)
 - [Documentation index](docs/README.md)
 
@@ -46,6 +49,22 @@ python3 -m venv .venv
 .venv/bin/notebooklm login
 .venv/bin/notebooklm auth check --test --json
 ```
+
+## Agent-direct installation
+
+Coding Agents should read [`AGENTS.md`](AGENTS.md), then use the preview-first,
+project-local installer:
+
+```bash
+uv sync
+.venv/bin/notebooklm-evergreen brain-install-plan --project-root /path/to/project --client auto
+.venv/bin/notebooklm-evergreen brain-install --project-root /path/to/project --client auto --confirm
+.venv/bin/notebooklm-evergreen brain-doctor --project-root /path/to/project --client auto
+```
+
+The installer preserves unrelated configuration, blocks conflicts, rolls back
+partial writes, and never selects a Notebook or uploads sources. See
+[Agent-direct installation](docs/agent-install.md).
 
 ## Quick start
 
@@ -88,6 +107,39 @@ Or adopt an existing one:
   --config advisor.json --adopt-notebook-id NOTEBOOK_ID
 ```
 
+For an Ask-Only advisor (QA without automated research sweeps), set `"research": {"enabled": false}` and omit research queries and watchlist.
+
+Bind an existing Advisor to a repository as its project-local Project Brain:
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli brain-init \
+  --project-root /absolute/path/to/project \
+  --advisor-id ADVISOR_ID
+```
+
+Start the read-only stdio MCP server:
+
+```bash
+.venv/bin/notebooklm-project-brain-mcp
+```
+
+Formal project explanation and context recovery fail closed until
+`brain_grounding_check` reports `project_ready`. See the
+[Project Brain pilot guide](docs/project-brain-pilot.md).
+
+List registered advisors:
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli list-advisors
+.venv/bin/python -m notebooklm_skill.cli list-advisors --json
+```
+
+Update an existing advisor configuration (partial merge semantics, omitted sections preserved):
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli update-config --config update.json
+```
+
 Add and protect a canonical URL seed:
 
 ```bash
@@ -97,13 +149,14 @@ Add and protect a canonical URL seed:
   --state pinned
 ```
 
-Run a non-mutating research preview:
+Run a non-mutating research preview (supports `--query` for ad-hoc custom topic exploration):
 
 ```bash
 .venv/bin/python -m notebooklm_skill.cli preview \
   --advisor-id market-watch \
   --run-id preview-20260822 \
-  --work-directory ./runs/preview-20260822
+  --work-directory ./runs/preview-20260822 \
+  --query "optional ad-hoc custom query"
 ```
 
 Build a review plan:

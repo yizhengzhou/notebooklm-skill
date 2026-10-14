@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from notebooklm_skill.backend import (
+    AccountLimits,
     AskResponse,
     BackendCapabilities,
     ChatConfig,
@@ -55,6 +56,10 @@ class FakeNotebookBackend:
         self.add_url_commit_then_fail = False
         self.conversations: dict[str, str | None] = {}
         self._conversation_counter = 0
+        self.notebook_limit: int | None = 100
+        self.source_limit: int | None = 50
+        self.tier: int | None = 1
+        self.fail_account_limits = False
 
     async def create_notebook(self, title: str) -> NotebookRef:
         notebook_id = f"fake-{uuid4()}"
@@ -65,6 +70,15 @@ class FakeNotebookBackend:
     async def get_notebook(self, notebook_id: str) -> NotebookRef:
         notebook = self.notebooks[notebook_id]
         return NotebookRef(notebook_id=notebook.notebook_id, title=notebook.title)
+
+    async def get_account_limits(self) -> AccountLimits:
+        if self.fail_account_limits:
+            raise RuntimeError("injected account-limit failure")
+        return AccountLimits(
+            notebook_limit=self.notebook_limit,
+            source_limit=self.source_limit,
+            tier=self.tier,
+        )
 
     async def configure_chat(
         self,

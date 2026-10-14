@@ -5,6 +5,7 @@ import pytest
 
 from notebooklm_skill.apply_executor import ApplyExecutor
 from notebooklm_skill.apply_plan import build_apply_plan, write_apply_plan
+from notebooklm_skill.capacity import SourceCapacityExceededError
 from notebooklm_skill.models import SourceRecord
 from notebooklm_skill.preview import CandidateReview, PreviewPlan
 from tests.fake_backend import FakeNotebookBackend
@@ -161,6 +162,32 @@ def test_apply_executor_resume_reuses_completed_summary(tmp_path: Path) -> None:
 
         assert backend.events.count("import") == 1
         assert backend.events.count("ask") == 1
+
+    asyncio.run(scenario())
+
+
+def test_apply_executor_blocks_add_before_delete_when_peak_exceeds_capacity(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        backend, notebook_id, pinned, legacy, plan, plan_path = await setup_plan(tmp_path)
+        backend.source_limit = 2
+
+        with pytest.raises(SourceCapacityExceededError) as exc_info:
+            await ApplyExecutor(backend).execute(
+                plan_path=plan_path,
+                approved_digest=plan.digest,
+                evidence_directory=tmp_path / "evidence",
+            )
+
+        assert exc_info.value.capacity.used == 2
+        assert exc_info.value.capacity.peak_used == 3
+        assert exc_info.value.capacity.limit == 2
+        assert backend.events == []
+        assert {source.source_id for source in await backend.list_sources(notebook_id)} == {
+            pinned.source_id,
+            legacy.source_id,
+        }
 
     asyncio.run(scenario())
 

@@ -11,6 +11,27 @@ from notebooklm_skill.backend import ResponseLength
 SCHEMA_VERSION = 1
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
+SourceRole = Literal[
+    "project_overview",
+    "architecture",
+    "current_status",
+    "decisions",
+    "runbook",
+    "handoff",
+    "external_research",
+    "reference",
+]
+SOURCE_ROLES = {
+    "project_overview",
+    "architecture",
+    "current_status",
+    "decisions",
+    "runbook",
+    "handoff",
+    "external_research",
+    "reference",
+}
+
 
 def _validate_id(value: str, label: str) -> None:
     if not _ID_PATTERN.fullmatch(value):
@@ -55,8 +76,8 @@ class PersonaProfile:
 
 @dataclass(frozen=True)
 class ResearchProfile:
-    brief: str
-    queries: tuple[str, ...]
+    brief: str = ""
+    queries: tuple[str, ...] = ()
     mode: Literal["fast", "deep"] = "deep"
     language: str = "zh-Hant"
     recency_days: int = 90
@@ -67,14 +88,18 @@ class ResearchProfile:
     enabled: bool = True
 
     def __post_init__(self) -> None:
-        if not self.brief.strip() or not self.queries or any(not item.strip() for item in self.queries):
-            raise ValueError("Research brief and non-empty queries are required")
+        if self.enabled:
+            if not self.brief.strip() or not self.queries or any(not item.strip() for item in self.queries):
+                raise ValueError("Research brief and non-empty queries are required")
+            if self.recency_days < 1 or self.max_new_sources_per_run < 1:
+                raise ValueError("Research limits must be positive")
+        else:
+            if self.recency_days < 0 or self.max_new_sources_per_run < 0:
+                raise ValueError("Research limits cannot be negative")
         if self.mode not in {"fast", "deep"}:
             raise ValueError(f"Unsupported research mode: {self.mode}")
         if self.update_mode != "review" or self.deletion_mode != "confirm":
             raise ValueError("Phase 2 requires reviewed updates and confirmed deletion")
-        if self.recency_days < 1 or self.max_new_sources_per_run < 1:
-            raise ValueError("Research limits must be positive")
         if any(
             not domain.strip() or "://" in domain or "/" in domain
             for domain in self.preferred_domains
@@ -99,17 +124,18 @@ class ResearchProfile:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ResearchProfile:
         _require_schema(data)
+        enabled = bool(data.get("enabled", True))
         return cls(
-            enabled=bool(data["enabled"]),
-            brief=str(data["brief"]),
-            queries=tuple(str(item) for item in data["queries"]),
-            mode=data["mode"],
-            language=str(data["language"]),
-            recency_days=int(data["recency_days"]),
-            max_new_sources_per_run=int(data["max_new_sources_per_run"]),
-            preferred_domains=tuple(str(item) for item in data.get("preferred_domains", [])),
-            update_mode=data["update_mode"],
-            deletion_mode=data["deletion_mode"],
+            enabled=enabled,
+            brief=str(data.get("brief", "")),
+            queries=tuple(str(item) for item in data.get("queries", ())),
+            mode=data.get("mode", "deep"),
+            language=str(data.get("language", "zh-Hant")),
+            recency_days=int(data.get("recency_days", 90)),
+            max_new_sources_per_run=int(data.get("max_new_sources_per_run", 10)),
+            preferred_domains=tuple(str(item) for item in data.get("preferred_domains", ())),
+            update_mode=data.get("update_mode", "review"),
+            deletion_mode=data.get("deletion_mode", "confirm"),
         )
 
 
@@ -204,6 +230,10 @@ class SourceRecord:
     last_verified_at: str | None = None
     last_modified_at: str | None = None
     research_run_id: str | None = None
+    roles: tuple[SourceRole, ...] = ()
+    project_path: str | None = None
+    content_sha256: str | None = None
+    git_commit: str | None = None
 
     def __post_init__(self) -> None:
         _validate_id(self.local_id, "local source ID")
@@ -213,6 +243,21 @@ class SourceRecord:
             raise ValueError(f"Unsupported source state: {self.state}")
         if self.origin not in {"manual", "research", "import"}:
             raise ValueError(f"Unsupported source origin: {self.origin}")
+        if any(role not in SOURCE_ROLES for role in self.roles):
+            raise ValueError(f"Unsupported source role(s): {self.roles}")
+        if len(set(self.roles)) != len(self.roles):
+            raise ValueError("Source roles must be unique")
+        if self.project_path is not None and (
+            not self.project_path.strip()
+            or self.project_path.startswith("/")
+            or ".." in self.project_path.split("/")
+        ):
+            raise ValueError("project_path must be a safe repository-relative path")
+        if self.content_sha256 is not None and (
+            len(self.content_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in self.content_sha256)
+        ):
+            raise ValueError("content_sha256 must be 64 lowercase hexadecimal characters")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -227,11 +272,17 @@ class SourceRecord:
             "last_verified_at": self.last_verified_at,
             "last_modified_at": self.last_modified_at,
             "research_run_id": self.research_run_id,
+            "roles": list(self.roles),
+            "project_path": self.project_path,
+            "content_sha256": self.content_sha256,
+            "git_commit": self.git_commit,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SourceRecord:
-        return cls(**data)
+        values = dict(data)
+        values["roles"] = tuple(str(role) for role in values.get("roles", ()))
+        return cls(**values)
 
 
 @dataclass(frozen=True)

@@ -8,9 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Minimal "Ask-Only" Advisor configuration support: `ResearchProfile` now gracefully defaults when `enabled=False`, allowing QA-only advisors with minimal schema.
+- `list-advisors` CLI command: lists all registered advisors on the system in formatted table or JSON (`--json`).
+- `update-config` CLI command: safely updates title, persona, research profile, and watchlist of an existing advisor without recreating notebooks.
+- Ad-hoc custom query override for Deep Research: `preview --query "..."` supports one-off exploratory searches without mutating advisor configuration.
+- Helpful collision hint for `setup` command on existing advisors.
+- Project-local first-phase binding commands: `brain-init`, `brain-discover`, and `brain-status`.
+- Review-only `brain-onboarding-plan`, explicit project source roles/provenance, and fail-closed `brain-grounding-check` readiness classification.
+- Read-only Project Brain MCP server with discovery, capabilities, health, grounding, onboarding, advisory ask, and context recovery tools.
+- `project-explainer` Skill skeleton with the `karpathy-explain` preset and mandatory grounding gate.
+- Agent-direct installation contract (`AGENTS.md`) plus preview-first `brain-install-plan`, no-clobber `brain-install`, `brain-doctor`, and bounded `brain-uninstall` for Pi, Claude Code, and generic project-local layouts.
+- Live `source-capacity` reporting with server-advertised limits, conservative fallback, warning states, Registry/backend drift visibility, and planned-peak calculation.
+- Fail-closed source capacity preflight and post-add backend snapshot verification for direct source additions and reviewed research Apply.
 - `source-add-url` for canonical, ready-verified, timeout-reconcilable URL seed sources with optional pinned protection.
 - `ask` CLI command for direct or file-backed source-grounded Advisor questions.
 - Explicit reviewed URL selection before Apply, with full candidate-pool choice bounded by the Preview source budget.
+
+### Fixed
+- Fixed `update-config` wiping omitted fields: introduced `load_update_document()` to distinguish omitted keys from explicit falsy values, guaranteeing true partial merge semantics so omitted `title`, `persona`, `research`, and `watchlist` are safely preserved.
 
 ### Documentation
 - Added a complete user guide and current-status handoff.

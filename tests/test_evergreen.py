@@ -10,8 +10,9 @@ from notebooklm_skill.evergreen import (
     BackendCapabilityError,
     EvergreenService,
     compose_research_query,
+    load_update_document,
 )
-from notebooklm_skill.models import PersonaProfile, RefreshRun, ResearchProfile, SourceRecord
+from notebooklm_skill.models import PersonaProfile, RefreshRun, ResearchProfile, SourceRecord, WatchItem
 from notebooklm_skill.preview import CandidateReview, PreviewPlan
 from notebooklm_skill.refresh import RefreshPlanner, write_refresh_plan
 from notebooklm_skill.storage import AdvisorStore
@@ -267,6 +268,116 @@ def test_add_text_source_registers_and_reconciles_without_duplicates(
         assert first.canonical_url is None
         assert len(store.load("advisor-001")[2]) == 1
         assert len([event for event in backend.events if event.startswith("add_text:")]) == 1
+
+    asyncio.run(scenario())
+
+
+def test_add_text_source_records_project_role_and_rejects_content_mismatch(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+
+        first = await service.add_text_source(
+            advisor_id="advisor-001",
+            title="README.md",
+            content="Project overview.",
+            state="pinned",
+            roles=("project_overview",),
+            project_path="README.md",
+            git_commit="abc123",
+        )
+        assert first.roles == ("project_overview",)
+        assert first.project_path == "README.md"
+        assert first.content_sha256 is not None
+        assert first.git_commit == "abc123"
+
+        with pytest.raises(RuntimeError, match="SOURCE_CONTENT_MISMATCH"):
+            await service.add_text_source(
+                advisor_id="advisor-001",
+                title="README.md",
+                content="Changed local content.",
+                roles=("project_overview",),
+                project_path="README.md",
+            )
+        assert len(store.load("advisor-001")[2]) == 1
+        assert len([event for event in backend.events if event.startswith("add_text:")]) == 1
+
+    asyncio.run(scenario())
+
+
+def test_add_text_source_adopts_exact_unregistered_backend_source_without_duplicate(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        setup = await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+        existing = await backend.add_text_source(
+            setup.notebook.notebook_id,
+            "README.md",
+            "Project overview.",
+        )
+
+        adopted = await service.add_text_source(
+            advisor_id="advisor-001",
+            title="README.md",
+            content="Project overview.",
+            roles=("project_overview",),
+            project_path="README.md",
+        )
+
+        assert adopted.backend_source_id == existing.source_id
+        assert adopted.roles == ("project_overview",)
+        assert len(backend.sources[setup.notebook.notebook_id]) == 1
+        assert len(store.load("advisor-001")[2]) == 1
+
+    asyncio.run(scenario())
+
+
+def test_add_text_source_refuses_same_title_backend_mismatch_without_duplicate(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        setup = await service.setup(
+            advisor_id="advisor-001",
+            title="Advisor",
+            persona=PersonaProfile("Evidence-focused advisor."),
+            research=research_profile(),
+        )
+        await backend.add_text_source(
+            setup.notebook.notebook_id,
+            "README.md",
+            "Old content.",
+        )
+
+        with pytest.raises(RuntimeError, match="SOURCE_CONTENT_MISMATCH"):
+            await service.add_text_source(
+                advisor_id="advisor-001",
+                title="README.md",
+                content="New content.",
+                roles=("project_overview",),
+                project_path="README.md",
+            )
+        assert len(backend.sources[setup.notebook.notebook_id]) == 1
+        assert store.load("advisor-001")[2] == ()
 
     asyncio.run(scenario())
 
@@ -626,3 +737,121 @@ def test_format_answer_with_citations(tmp_path: Path) -> None:
     assert "https://example.com/spec" in formatted
     assert "字元 100–136" in formatted
     assert "MCP clients MUST support discovery." in formatted
+
+
+def test_update_advisor_updates_profile_and_syncs_persona(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        setup = await service.setup(
+            advisor_id="advisor-update",
+            title="Old Title",
+            persona=PersonaProfile("Old Instructions"),
+            research=research_profile(),
+            watchlist=(WatchItem("w-1", "trend", "Statement"),),
+        )
+
+        updated = await service.update_advisor(
+            advisor_id="advisor-update",
+            title="New Title",
+            persona=PersonaProfile("New Instructions", response_length="longer"),
+            research=ResearchProfile(enabled=False),
+            watchlist=(),
+        )
+
+        assert updated.title == "New Title"
+        assert updated.persona.instructions == "New Instructions"
+        assert updated.persona.response_length == "longer"
+        assert updated.research.enabled is False
+        assert backend.notebooks[setup.notebook.notebook_id].persona == "New Instructions"
+        assert backend.notebooks[setup.notebook.notebook_id].response_length == "longer"
+
+        loaded, watchlist, _ = store.load("advisor-update")
+        assert loaded.title == "New Title"
+        assert len(watchlist) == 0
+
+    asyncio.run(scenario())
+
+
+def test_load_update_document_parses_partial_keys(tmp_path: Path) -> None:
+    import json
+
+    # 1. Full document
+    full_path = tmp_path / "full.json"
+    full_path.write_text(
+        json.dumps(
+            {
+                "advisor_id": "adv-1",
+                "title": "Title 1",
+                "persona": {"instructions": "Inst 1", "response_length": "longer"},
+                "research": {"enabled": False},
+                "watchlist": [{"watch_id": "w-1", "kind": "trend", "statement": "Stmt"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    adv_id, title, persona, research, watchlist = load_update_document(full_path)
+    assert adv_id == "adv-1"
+    assert title == "Title 1"
+    assert persona is not None and persona.instructions == "Inst 1"
+    assert research is not None and research.enabled is False
+    assert watchlist is not None and len(watchlist) == 1
+
+    # 2. Minimal / Partial document (only advisor_id and persona)
+    partial_path = tmp_path / "partial.json"
+    partial_path.write_text(
+        json.dumps(
+            {
+                "advisor_id": "adv-2",
+                "persona": {"instructions": "Only Persona"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    adv_id2, title2, persona2, research2, watchlist2 = load_update_document(partial_path)
+    assert adv_id2 == "adv-2"
+    assert title2 is None
+    assert persona2 is not None and persona2.instructions == "Only Persona"
+    assert research2 is None
+    assert watchlist2 is None
+
+    # 3. Missing advisor_id
+    bad_path = tmp_path / "bad.json"
+    bad_path.write_text(json.dumps({"title": "No ID"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="Missing 'advisor_id'"):
+        load_update_document(bad_path)
+
+
+def test_update_advisor_partial_merge_preserves_unspecified_fields(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        backend = FakeNotebookBackend()
+        store = AdvisorStore(tmp_path / "advisors")
+        service = EvergreenService(backend, store)
+        orig_research = research_profile()
+        await service.setup(
+            advisor_id="advisor-keep",
+            title="Original Title",
+            persona=PersonaProfile("Original Persona"),
+            research=orig_research,
+            watchlist=(WatchItem("w-orig", "trend", "Keep this watch item"),),
+        )
+
+        # Update ONLY persona (title, research, watchlist are None)
+        updated = await service.update_advisor(
+            advisor_id="advisor-keep",
+            persona=PersonaProfile("New Persona Only"),
+        )
+
+        assert updated.title == "Original Title"
+        assert updated.persona.instructions == "New Persona Only"
+        assert updated.research == orig_research
+        assert updated.research.enabled is True
+
+        loaded, loaded_watchlist, _ = store.load("advisor-keep")
+        assert loaded.title == "Original Title"
+        assert loaded.research.brief == orig_research.brief
+        assert len(loaded_watchlist) == 1
+        assert loaded_watchlist[0].watch_id == "w-orig"
+
+    asyncio.run(scenario())

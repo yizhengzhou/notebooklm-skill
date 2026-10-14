@@ -26,8 +26,11 @@ for one.
 - Use `python -m notebooklm_skill.cli ...` as the supported entry point.
 - Do not use `scripts/`, Patchright, browser selectors, browser daemons, or the
   old project-folder library for v2 operations.
-- Do not scan project folders, install Git hooks, enforce Research/Project pairs,
-  or auto-upload commits.
+- Evergreen Advisor commands do not scan project folders, install Git hooks,
+  enforce Research/Project pairs, or auto-upload commits. The separate Project
+  Brain onboarding command may produce a review-only candidate scan after a
+  project-local manifest exists; the responsible project Agent must read and
+  approve candidates before any upload.
 - Chat Persona and Studio artifact generation instructions are separate. Never
   claim that a Chat Persona automatically controls reports, slides, or audio.
 - If external web content must be fetched outside NotebookLM's own research
@@ -44,6 +47,33 @@ notebooklm auth check --test --json
 
 Credentials must never be copied into profile, registry, run, preview, plan, or
 export files.
+
+## Project Brain mode
+
+For a repository-bound Notebook, prefer the read-only Project Brain MCP tools:
+
+- `brain_discover`
+- `brain_health`
+- `brain_capabilities`
+- `brain_grounding_check`
+- `brain_onboarding_plan`
+- `brain_ask`
+- `brain_recover`
+
+The binding lives in `.notebooklm/brain.json` and stores the full Notebook UUID.
+Never infer the Notebook from recent selection. For any formal project
+explanation or context recovery, require `grounding.status == "project_ready"`.
+If grounding is incomplete or stale, the responsible project Agent must read
+local candidates, propose a sync plan, and obtain confirmation before source
+mutation.
+
+Use the dedicated `project-explainer` skill for project onboarding,
+architecture explanation, context recovery, and the `karpathy-explain` preset.
+
+When asked to install this integration, follow the repository `AGENTS.md` and
+use `brain-install-plan` → `brain-install --confirm` → `brain-doctor`. Install
+project-locally, preserve unrelated client configuration, and do not choose a
+Notebook or upload sources as part of installation.
 
 ## Create or adopt an Advisor
 
@@ -81,6 +111,25 @@ Prepare an input JSON file:
   ]
 }
 ```
+
+#### Minimal "Ask-Only" Profile (No Automated Research)
+
+If you only need a source-grounded QA advisor and do not want automated research sweeps, omit the research details and watchlist:
+
+```json
+{
+  "advisor_id": "fast-qa",
+  "title": "Fast QA Advisor",
+  "persona": {
+    "instructions": "Act as an evidence-focused advisor. Answer strictly from sources."
+  },
+  "research": {
+    "enabled": false
+  }
+}
+```
+
+When `research.enabled` is `false`, fields like `brief`, `queries`, `max_new_sources_per_run`, and `watchlist` are completely optional and default safely.
 
 ### Writing `persona.instructions`
 
@@ -197,6 +246,28 @@ python -m notebooklm_skill.cli setup \
   --adopt-notebook-id NOTEBOOK_ID
 ```
 
+If `setup` fails with `Advisor already exists: '<id>'`, the Advisor is already registered in local state. Do not create duplicate notebooks; inspect it or update it:
+
+```bash
+# Inspect registered state
+python -m notebooklm_skill.cli show --advisor-id market-watch
+
+# Update configuration without re-creating (partial merge semantics)
+# Only keys explicitly present in the JSON are updated; omitted sections
+# ('title', 'persona', 'research', or 'watchlist') are safely preserved.
+python -m notebooklm_skill.cli update-config --config update.json
+```
+
+List all registered Advisors on this machine:
+
+```bash
+# Formatted table
+python -m notebooklm_skill.cli list-advisors
+
+# JSON format for agent pipelines
+python -m notebooklm_skill.cli list-advisors --json
+```
+
 Add or reconcile a user-supplied canonical URL and protect it as a seed source:
 
 ```bash
@@ -253,17 +324,29 @@ address a specific `--conversation-id` explicitly.
 
 ## Manual Evergreen cycle
 
-### 1. Preview only
+### 1. Preview only (Deep Research)
 
-The query is composed from Research Profile, active Watch Items, recency, and
-last successful refresh. Preview starts or resumes one Deep Research task and
-must not mutate sources.
+> [!IMPORTANT]
+> `ask` only queries sources already ingested into the Notebook. It does NOT search the web.
+> To search for new web content, use the 3-step Deep Research workflow: `preview` → `plan-apply` → `apply`.
+
+Preview starts or resumes one Deep Research search task and never mutates sources.
+- **Standing profile query**: By default, the query is composed from the Advisor's `ResearchProfile` (brief + queries), active Watchlist items, and recency window.
+- **Ad-hoc exploratory query**: Use `--query` to override the standing profile for a one-off topic search without changing the Advisor configuration.
 
 ```bash
+# Using standing Research Profile:
 python -m notebooklm_skill.cli preview \
   --advisor-id market-watch \
   --run-id preview-20260822 \
   --work-directory ./runs/preview-20260822
+
+# Using ad-hoc exploratory search query:
+python -m notebooklm_skill.cli preview \
+  --advisor-id market-watch \
+  --run-id preview-20260822 \
+  --work-directory ./runs/preview-20260822 \
+  --query "specific security vulnerabilities in oauth2 authorization code flow"
 ```
 
 On timeout, resume with the same run ID and directory. Do not start another
@@ -400,6 +483,12 @@ Default Advisor state:
 
 Set `NOTEBOOKLM_SKILL_HOME` to override the root. Tests must always inject a
 temporary state root.
+
+### Directory Roles & Common Pitfalls
+
+- **Advisor State Directory** (Platform App Data): The single source of truth for registered Advisors, profiles, source registry, and execution history. Inspected via `list-advisors` and `show`.
+- **`./runs/` directory**: Ephemeral execution work directory for preview plans, approval digests, and candidates. Holds execution artifacts, NOT registered state.
+- **`./data/library.json`**: Deprecated legacy v1 file. v2 completely ignores it. Never expect v2 to sync with this file.
 
 ## Legacy v1
 

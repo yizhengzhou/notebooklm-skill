@@ -9,6 +9,7 @@ from typing import Any
 
 from notebooklm_skill.apply_plan import verify_apply_plan
 from notebooklm_skill.backend import NotebookBackend, ResearchCandidate, SourceSnapshot
+from notebooklm_skill.capacity import require_source_capacity
 from notebooklm_skill.preview import canonicalize_url
 from notebooklm_skill.storage import _atomic_write, _write_json
 
@@ -88,6 +89,13 @@ class ApplyExecutor:
             for item in plan["additions"]
         )
         imported = self._resolve_existing_additions(current, additions)
+        missing_additions = len(additions) - len(imported)
+        if missing_additions:
+            await require_source_capacity(
+                self.backend,
+                notebook_id,
+                planned_additions=missing_additions,
+            )
         if current_ids == baseline_ids:
             imported = await self.backend.import_research_sources(
                 notebook_id,

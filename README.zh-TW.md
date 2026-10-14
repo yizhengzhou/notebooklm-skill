@@ -27,6 +27,9 @@ End-user Persona model。Studio artifact generation instructions 與 Chat Person
 ## 狀態與指南
 
 - [目前實作狀態與交接](docs/current-status.md)
+- [Agent 直接安裝](docs/agent-install.md)
+- [Project Brain 第一階段測試指南](docs/project-brain-pilot.md)
+- [Project Brain MCP 設定](docs/project-brain-mcp.md)
 - [完整使用指南](docs/user-guide.md)
 - [文件索引](docs/README.md)
 
@@ -43,6 +46,21 @@ python3 -m venv .venv
 .venv/bin/notebooklm login
 .venv/bin/notebooklm auth check --test --json
 ```
+
+## Agent 直接安裝
+
+Coding Agent 應先讀取 [`AGENTS.md`](AGENTS.md)，再使用 preview-first、
+project-local installer：
+
+```bash
+uv sync
+.venv/bin/notebooklm-evergreen brain-install-plan --project-root /path/to/project --client auto
+.venv/bin/notebooklm-evergreen brain-install --project-root /path/to/project --client auto --confirm
+.venv/bin/notebooklm-evergreen brain-doctor --project-root /path/to/project --client auto
+```
+
+Installer 會保留無關設定、阻擋衝突、在部分寫入失敗時 rollback，而且不會自行選擇
+Notebook 或上傳 sources。詳見 [Agent 直接安裝](docs/agent-install.md)。
 
 ## 快速開始
 
@@ -85,6 +103,38 @@ python3 -m venv .venv
   --config advisor.json --adopt-notebook-id NOTEBOOK_ID
 ```
 
+若需純問答（Ask-Only），設定檔中只需將 `research.enabled` 設為 `false`，其餘 research 欄位與 watchlist 皆可省略。
+
+將既有 Advisor 綁定為某個 repository 的 project-local Project Brain：
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli brain-init \
+  --project-root /absolute/path/to/project \
+  --advisor-id ADVISOR_ID
+```
+
+啟動 read-only stdio MCP server：
+
+```bash
+.venv/bin/notebooklm-project-brain-mcp
+```
+
+在 `brain_grounding_check` 回報 `project_ready` 前，正式專案解釋與 context recovery
+都會 fail closed。詳見 [Project Brain 第一階段測試指南](docs/project-brain-pilot.md)。
+
+列出已登記的參謀：
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli list-advisors
+.venv/bin/python -m notebooklm_skill.cli list-advisors --json
+```
+
+更新既有參謀設定（局部合併語意，未指定的欄位自動保留原值）：
+
+```bash
+.venv/bin/python -m notebooklm_skill.cli update-config --config update.json
+```
+
 加入並保護 canonical URL seed：
 
 ```bash
@@ -94,13 +144,14 @@ python3 -m venv .venv
   --state pinned
 ```
 
-執行不修改來源的研究 Preview：
+執行不修改來源的研究 Preview（支援使用 `--query` 覆蓋預設搜尋詞進行單次探索）：
 
 ```bash
 .venv/bin/python -m notebooklm_skill.cli preview \
   --advisor-id market-watch \
   --run-id preview-20260822 \
-  --work-directory ./runs/preview-20260822
+  --work-directory ./runs/preview-20260822 \
+  --query "選填：單次自訂搜尋詞"
 ```
 
 建立 Apply Plan：

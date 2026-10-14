@@ -1,9 +1,9 @@
 # 目前開發狀態與交接說明
 
-> 更新日期：2026-08-27
+> 更新日期：2026-10-14
 >
-> 公開版本：`2.0.0`，另有已推上 `main` 但尚未發版的 CLI 增量功能
-> 核心測試：77 tests (100% PASS)，`ruff check` clean
+> 公開版本：`2.0.0`；工作目錄另有尚未發版的 CLI／Project Brain 增量功能
+> 核心測試：99 tests (100% PASS)，`ruff check` clean
 
 ## 1. 目前產品是什麼
 
@@ -21,6 +21,27 @@
 - **本地檔案文字來源匯入（`source-add-file`，2026-08-26 新增）**
 
 目前 `persona` 欄位代表 **NotebookLM Custom Chat instructions**。
+
+### 2026-10-14：Project Brain 路線已開始實作
+
+完整路線見 [`2026-10-13-project-brain-mcp-skill-development-roadmap.md`](plans/2026-10-13-project-brain-mcp-skill-development-roadmap.md)。第一批已完成：
+
+- `source-capacity`：讀取 NotebookLM server-advertised notebook/source limits，顯示 used／remaining／planned peak／warning state。
+- `source-add-url`、`source-add-file`、reviewed research Apply：新增前 capacity preflight；新增後 backend snapshot／ready verification，禁止無聲成功。
+- `brain-init`：將既有 Advisor／完整 Notebook UUID 寫入 project-local `.notebooklm/brain.json`，no-clobber。
+- `brain-discover`：從任意子目錄向上尋找最近 manifest；無 manifest 不猜 Notebook。
+- `brain-status`：驗證 manifest、Advisor、Notebook access，揭露 Registry/backend source count drift、live capacity 與 grounding summary。
+- `brain-onboarding-plan`：以保守 heuristic 產生 review-only 文件候選；明確要求負責專案的 Agent 實際讀取後確認。
+- `source-add-file --role ...`：保存明確 source role、project-relative path、內容 SHA-256 與 Git commit；同名 backend 內容不同時 fail closed。
+- `brain-grounding-check`：區分 `research_only`、`project_partial`、`project_ready`、`project_stale`、`unknown`；只有必要角色完整且本地 hash 仍一致時允許專案解釋。
+- 第一批 read-only MCP 已加入：`brain_discover`、`brain_capabilities`、`brain_health`、`brain_grounding_check`、`brain_onboarding_plan`、`brain_ask`、`brain_recover`。
+- `brain_ask purpose=project_explanation` 與 `brain_recover` 在非 `project_ready` 時 fail closed。
+- 新增 `skills/project-explainer/SKILL.md` skeleton 與 `karpathy-explain` preset。
+- 新增頂層 `AGENTS.md` 安裝契約，以及 `brain-install-plan`／`brain-install`／`brain-doctor`／`brain-uninstall`，支援 Pi、Claude Code 與 generic project-local layouts。
+- Installer preview-first、no-clobber、保留無關 MCP 設定、多檔失敗 rollback；uninstall 不刪 manifest、Advisor、Notebook 或 sources。
+- 真實帳號 read-only pilot 已通過；沒有新增、刪除或修改 Notebook sources。
+
+目前仍是第一階段 pilot：自動同步、source mutation MCP 與 Studio artifact tools 尚未接通。測試方式見 [`agent-install.md`](agent-install.md)、[`project-brain-pilot.md`](project-brain-pilot.md)及 [`project-brain-mcp.md`](project-brain-mcp.md)。
 
 ## 2. 已完成能力
 

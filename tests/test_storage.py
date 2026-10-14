@@ -118,3 +118,26 @@ def test_concurrent_profile_writes_remain_valid_json(tmp_path: Path) -> None:
     profile, _, _ = store.load(original.advisor_id)
     assert profile.title in {f"Advisor {index}" for index in range(24)}
     json.loads((store.advisor_directory(original.advisor_id) / "profile.json").read_text())
+
+
+def test_advisor_store_list_advisors(tmp_path: Path) -> None:
+    store = AdvisorStore(tmp_path / "advisors")
+    assert store.list_advisors() == ()
+
+    p1 = sample_profile(advisor_id="adv-b", title="Advisor B")
+    p2 = sample_profile(advisor_id="adv-a", title="Advisor A")
+    store.create(p1, sources=sample_sources())
+    store.create(p2)
+
+    # Corrupted directory and lock file should be safely ignored
+    (tmp_path / "advisors" / ".lock").touch()
+    corrupt_dir = tmp_path / "advisors" / "corrupt"
+    corrupt_dir.mkdir()
+
+    advisors = store.list_advisors()
+    assert len(advisors) == 2
+    assert advisors[0].advisor_id == "adv-a"
+    assert advisors[0].title == "Advisor A"
+    assert advisors[0].source_count == 0
+    assert advisors[1].advisor_id == "adv-b"
+    assert advisors[1].source_count == len(sample_sources())

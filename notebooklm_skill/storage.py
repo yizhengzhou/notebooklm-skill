@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -24,6 +25,27 @@ from notebooklm_skill.models import (
     _validate_id,
 )
 from notebooklm_skill.paths import advisors_root
+
+
+@dataclass(frozen=True)
+class AdvisorSummary:
+    advisor_id: str
+    title: str
+    backend_type: str
+    notebook_id: str
+    research_enabled: bool
+    source_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "advisor_id": self.advisor_id,
+            "title": self.title,
+            "backend_type": self.backend_type,
+            "notebook_id": self.notebook_id,
+            "research_enabled": self.research_enabled,
+            "source_count": self.source_count,
+        }
+
 
 _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
@@ -257,6 +279,40 @@ class AdvisorStore:
             tuple(SourceRecord.from_dict(item) for item in source_data["items"]),
             tuple(RefreshRun.from_dict(document) for document in run_documents),
         )
+
+    def list_advisors(self) -> tuple[AdvisorSummary, ...]:
+        if not self.root.is_dir():
+            return ()
+        summaries: list[AdvisorSummary] = []
+        for child in sorted(self.root.iterdir()):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            profile_path = child / "profile.json"
+            if not profile_path.is_file():
+                continue
+            try:
+                profile = _load_profile(child)
+                source_count = 0
+                sources_path = child / "sources.json"
+                if sources_path.is_file():
+                    try:
+                        sources_data = _read_json(sources_path)
+                        source_count = len(sources_data.get("items", []))
+                    except Exception:
+                        pass
+                summaries.append(
+                    AdvisorSummary(
+                        advisor_id=profile.advisor_id,
+                        title=profile.title,
+                        backend_type=profile.backend.type,
+                        notebook_id=profile.backend.notebook_id,
+                        research_enabled=profile.research.enabled,
+                        source_count=source_count,
+                    )
+                )
+            except Exception:
+                continue
+        return tuple(summaries)
 
     @staticmethod
     def _write_profile_files(directory: Path, profile: AdvisorProfile) -> None:

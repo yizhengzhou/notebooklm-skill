@@ -11,6 +11,7 @@ ResponseLength = Literal["default", "longer", "shorter"]
 @dataclass(frozen=True)
 class BackendCapabilities:
     persona_readback: bool = True
+    account_limits: bool = True
     deep_research: bool = True
     selective_import: bool = True
     native_refresh: bool = True
@@ -24,6 +25,13 @@ class BackendCapabilities:
 class NotebookRef:
     notebook_id: str
     title: str
+
+
+@dataclass(frozen=True)
+class AccountLimits:
+    notebook_limit: int | None = None
+    source_limit: int | None = None
+    tier: int | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +128,8 @@ class NotebookBackend(Protocol):
     async def create_notebook(self, title: str) -> NotebookRef: ...
 
     async def get_notebook(self, notebook_id: str) -> NotebookRef: ...
+
+    async def get_account_limits(self) -> AccountLimits: ...
 
     async def configure_chat(
         self,

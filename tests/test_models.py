@@ -23,3 +23,20 @@ def test_models_reject_unsupported_persona_length_and_source_state() -> None:
             state="unknown",
             origin="manual",
         )
+
+
+def test_research_profile_allows_minimal_ask_only() -> None:
+    # When enabled=False, brief and queries are allowed to be empty
+    profile = ResearchProfile(enabled=False)
+    assert profile.enabled is False
+    assert profile.brief == ""
+    assert profile.queries == ()
+
+    # from_dict with minimal enabled: false
+    dict_data = {"schema_version": 1, "enabled": False}
+    parsed = ResearchProfile.from_dict(dict_data)
+    assert parsed.enabled is False
+    assert parsed.brief == ""
+    assert parsed.queries == ()
+    assert parsed.mode == "deep"
+    assert parsed.recency_days == 90

@@ -9,9 +9,12 @@ from notebooklm_skill.models import (
 )
 
 
-def sample_profile(title: str = "Cross-domain advisor") -> AdvisorProfile:
+def sample_profile(
+    advisor_id: str = "cross-domain-advisor",
+    title: str = "Cross-domain advisor",
+) -> AdvisorProfile:
     return AdvisorProfile(
-        advisor_id="cross-domain-advisor",
+        advisor_id=advisor_id,
         title=title,
         backend=BackendRef(type="gemini-notebook", notebook_id="notebook-123"),
         persona=PersonaProfile(

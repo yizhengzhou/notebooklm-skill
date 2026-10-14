@@ -9,6 +9,7 @@ from notebooklm import ChatGoal, ChatResponseLength, NotebookLMClient
 from notebooklm.research import select_cited_sources
 
 from notebooklm_skill.backend import (
+    AccountLimits,
     AskResponse,
     BackendCapabilities,
     ChatConfig,
@@ -68,6 +69,15 @@ class GeminiNotebookBackend:
         async with self._client_factory() as client:
             notebook = await client.notebooks.get(notebook_id)
         return NotebookRef(notebook_id=notebook.id, title=notebook.title)
+
+    async def get_account_limits(self) -> AccountLimits:
+        async with self._client_factory() as client:
+            limits = await client.settings.get_account_limits()
+        return AccountLimits(
+            notebook_limit=limits.notebook_limit,
+            source_limit=limits.source_limit,
+            tier=limits.tier,
+        )
 
     async def configure_chat(
         self,

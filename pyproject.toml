@@ -10,11 +10,15 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-  "notebooklm-py[browser]==0.8.1",
+  "notebooklm-py[browser,mcp]==0.8.1",
 ]
 
 [project.scripts]
 notebooklm-evergreen = "notebooklm_skill.cli:main"
+notebooklm-project-brain-mcp = "notebooklm_skill.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["notebooklm_skill*"]
+
+[tool.setuptools.package-data]
+notebooklm_skill = ["bundled_skills/*/SKILL.md"]
